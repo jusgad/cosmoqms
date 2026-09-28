@@ -75,10 +75,12 @@ async function handleUserCreated(data: UserJSON): Promise<void> {
 }
 
 async function handleMembershipUpdated(membership: OrganizationMembershipJSON): Promise<void> {
-  await prisma.user.update({
-    where: { id: membership.public_user_data.user_id },
-    data: { role: resolveRole(membership.public_metadata) },
-  });
+  // Use the same upsert as `organizationMembership.created` (not `update`):
+  // out-of-order/redelivered webhooks, or a `user.created` that never found
+  // a membership to resolve its tenant, can mean no `User` row exists yet
+  // when `.updated` arrives. `update` would throw Prisma P2025 in that case
+  // and 500 the whole request, discarding the role change.
+  await upsertUserFromMembership(membership);
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
