@@ -43,6 +43,9 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
       {order.status === "planificado" && (
         <Button render={<Link href={`/produccion/${order.id}/pesaje`}>Registrar pesaje</Link>} />
       )}
+      {["pesado", "mezclado", "envasado", "calidad"].includes(order.status) && (
+        <Button render={<Link href={`/produccion/${order.id}/firma`}>Firmar</Link>} />
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="font-sans text-lg font-semibold text-foreground">Eventos del lote</h2>

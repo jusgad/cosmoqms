@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
-import { canTransition } from "@/lib/production/stateMachine";
+import { canTransition, nextStage } from "@/lib/production/stateMachine";
 import { generateOrderNumber } from "@/lib/production/generateOrderNumber";
-import { createProductionOrderInput, recordWeighingInput } from "@/lib/validation/production";
+import { createProductionOrderInput, recordWeighingInput, signInput } from "@/lib/validation/production";
 
 export const productionRouter = router({
   // NOTE: kept the brief's literal `orderBy: { createdBy: "asc" }` (Step 7)
@@ -85,6 +85,85 @@ export const productionRouter = router({
           },
         });
         return advanceStageInternal(tx, input.productionOrderId, "pesado");
+      }),
+    ),
+  // Non-negotiable (Global Constraint 3, CLAUDE.md rule 3): no electronic
+  // signature persists without `reauth_verified = true` and an explicit
+  // `meaning_statement` — `signInput`'s `reauthVerified: z.literal(true)` +
+  // `meaningStatement.min(10)` make this a Zod-level guarantee, enforced
+  // before this resolver ever runs (tRPC turns a failing ZodError into a
+  // TRPCError automatically). This is the pattern Task 12/13 copy for their
+  // own regulated mutations — QC fail / deviation approval require normal
+  // auth only, since *step-up* reauth is specific to signing (Blueprint
+  // Section 8).
+  //
+  // Advance-stage decision (resolving the brief/blueprint discrepancy flagged
+  // in this task's brief): the brief's literal Step 3 code only inserts a
+  // `BatchSignature` row and never touches `ProductionOrder.status`. Taken
+  // literally, that would leave the state machine with no way to reach
+  // `mezclado`/`envasado`/`calidad` at all in this build order, since no
+  // "record mixing"/"record packaging" mutation exists before Task 12 (QC).
+  // The blueprint's own language — "Ninguna transición de etapa se persiste
+  // sin firma válida" — reads as "a valid signature is what gates a stage
+  // transition", not "signing is a side record with no effect". `EventTimeline.tsx`
+  // (built in Task 10, before this task) already has a `case "signature"`
+  // summarizer expecting a `BatchEvent` with `payload.stage`, which is a
+  // second, independent signal that a `sign` call was always meant to also
+  // write a `BatchEvent` — the brief's literal Step 3 code omits that too.
+  // Decision: `sign` (a) verifies the order is actually at the stage being
+  // signed for — the client's `stage` input is never trusted as the *source*
+  // of truth, only compared against it — (b) writes the `BatchSignature` row,
+  // (c) writes a `BatchEvent` (`eventType: "signature"`) so the timeline
+  // reflects it, and (d) calls `advanceStageInternal` to the state machine's
+  // `nextStage` of the *current* (server-read) status, when one exists.
+  // `nextStage("calidad")` is `null` (see `stateMachine.ts`'s `SEQUENCE`), so
+  // signing off on `calidad` intentionally does NOT auto-advance to
+  // `liberado`/`rechazado` — that decision is a QC verdict, made by Task
+  // 12/13's own procedures (which the brief says require normal auth, not
+  // step-up), never by this generic "I did the work" attestation.
+  // TODO(Task 17): audit_log write via Prisma extension — writes to two
+  // regulated tables (batch_signatures, batch_events) plus a possible
+  // production_orders status update; same deferral as Tasks 7-10's routers.
+  sign: roleProcedure("operario", "jefe_planta", "calidad", "director_tecnico")
+    .input(signInput)
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        const order = await tx.productionOrder.findUniqueOrThrow({ where: { id: input.productionOrderId } });
+        if (order.status !== input.stage) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `La orden está en '${order.status}', no en '${input.stage}'`,
+          });
+        }
+
+        const signature = await tx.batchSignature.create({
+          data: {
+            productionOrderId: input.productionOrderId,
+            stage: input.stage,
+            signedBy: ctx.user.id,
+            meaningStatement: input.meaningStatement,
+            reauthVerified: input.reauthVerified,
+          },
+        });
+
+        await tx.batchEvent.create({
+          data: {
+            tenantId: ctx.user.tenantId,
+            productionOrderId: input.productionOrderId,
+            eventType: "signature",
+            payload: { stage: input.stage, signatureId: signature.id },
+            actorUserId: ctx.user.id,
+            occurredAt: new Date(),
+            clientEventId: crypto.randomUUID(),
+          },
+        });
+
+        const to = nextStage(order.status);
+        if (to) {
+          await advanceStageInternal(tx, input.productionOrderId, to);
+        }
+
+        return signature;
       }),
     ),
 });
