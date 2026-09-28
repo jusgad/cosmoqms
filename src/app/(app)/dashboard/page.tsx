@@ -38,13 +38,16 @@ export default async function DashboardPage() {
             expiryDate: { lte: expiryWindowEnd },
           },
         }),
-        // Ordenes liberadas cuyo cierre real (actualEnd) cae en el mes
-        // calendario actual.
-        tx.productionOrder.count({
+        // Lotes con firma final de liberacion (FinishedProductLot.releasedAt)
+        // dentro del mes calendario actual. Se usa releasedAt (el momento de
+        // la firma legal de director_tecnico) y no ProductionOrder.actualEnd
+        // (fin de actividad de planta) porque son eventos distintos: un lote
+        // puede terminar produccion en un mes y liberarse legalmente semanas
+        // despues, tras cerrar desviaciones.
+        tx.finishedProductLot.count({
           where: {
             tenantId: user.tenantId,
-            status: "liberado",
-            actualEnd: { gte: monthStart, lt: nextMonthStart },
+            releasedAt: { gte: monthStart, lt: nextMonthStart },
           },
         }),
       ]),
