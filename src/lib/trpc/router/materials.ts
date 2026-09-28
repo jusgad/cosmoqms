@@ -72,7 +72,12 @@ export const materialsRouter = router({
         return tx.rawMaterialLot.findUniqueOrThrow({ where: { id: input.id } });
       }),
     ),
-  listLots: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin").query(
+  // `operario` included (task-10 review round 1 fix): the weighing screen
+  // (WeighingForm.tsx) is used by `operario` to select a lot to weigh
+  // against, so it needs read access to this listing. Read-only, scoped to
+  // lot data already filtered client-side to `status === "liberado"` — no
+  // separation-of-duties rule is affected.
+  listLots: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin", "operario").query(
     ({ ctx }) =>
       tenantTx(ctx, (tx) =>
         tx.rawMaterialLot.findMany({

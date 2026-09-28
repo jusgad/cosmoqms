@@ -128,7 +128,15 @@ export function WeighingForm({
           ))}
         </select>
         {errors.rawMaterialLotId && <p className="text-sm text-destructive">{errors.rawMaterialLotId.message}</p>}
-        {!lotsQuery.isLoading && lots.length === 0 && (
+        {/* Task-10 review round 1 fix: a FORBIDDEN/network failure must be
+            visible, not look identical to "no lots in inventory" — otherwise
+            a future permission regression (like the operario-role gap this
+            same review found) silently hides itself behind an empty-state
+            message. */}
+        {lotsQuery.isError && (
+          <p className="text-sm text-destructive">Error al cargar los lotes disponibles.</p>
+        )}
+        {!lotsQuery.isLoading && !lotsQuery.isError && lots.length === 0 && (
           <p className="text-sm text-muted-foreground">No hay lotes liberados disponibles.</p>
         )}
       </div>
