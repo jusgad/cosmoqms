@@ -1,15 +1,8 @@
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
-
-export const receiveLotInput = z.object({
-  rawMaterialId: z.string().uuid(),
-  supplierLotCode: z.string().min(1),
-  supplierProvidedCode: z.string().optional(),
-  quantityReceived: z.number().positive(),
-  expiryDate: z.string(),
-  coaDocumentUrl: z.string().url().optional(),
-});
+import { receiveLotInput } from "@/lib/validation/materials";
 
 export const materialsRouter = router({
   list: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin").query(
@@ -20,11 +13,17 @@ export const materialsRouter = router({
     .query(({ ctx, input }) =>
       tenantTx(ctx, (tx) => tx.rawMaterial.findUniqueOrThrow({ where: { id: input.id } })),
     ),
+  // TODO(Task 17): audit_log write via Prisma extension — `create` writes to
+  // a regulated table (raw_materials) and per CLAUDE.md rule 2 must record
+  // an audit_log row in the same transaction. Deferred until the shared
+  // Prisma audit middleware/extension lands in Task 17; not silently missed.
   create: roleProcedure("bodega", "admin")
     .input(z.object({ code: z.string(), name: z.string(), unit: z.string(), category: z.string().optional() }))
     .mutation(({ ctx, input }) =>
       tenantTx(ctx, (tx) => tx.rawMaterial.create({ data: { ...input, tenantId: ctx.user.tenantId } })),
     ),
+  // TODO(Task 17): audit_log write via Prisma extension — `receiveLot`
+  // writes to a regulated table (raw_material_lots); same deferral as above.
   receiveLot: roleProcedure("bodega")
     .input(receiveLotInput)
     .mutation(({ ctx, input }) =>
@@ -47,10 +46,31 @@ export const materialsRouter = router({
         }),
       ),
     ),
+  // TODO(Task 17): audit_log write via Prisma extension — `setStatus`
+  // writes to a regulated table (raw_material_lots); same deferral as above.
+  //
+  // Server-side state machine (CLAUDE.md rule 7 — never trust client state):
+  // a lot may only move out of `cuarentena`. The `updateMany` below folds the
+  // current-status check into the `where` clause so the read and the guarded
+  // write happen atomically inside the same transaction; if zero rows match,
+  // the lot either doesn't exist or already left `cuarentena`, and either way
+  // the transition is rejected.
   setStatus: roleProcedure("bodega", "calidad")
     .input(z.object({ id: z.string().uuid(), status: z.enum(["liberado", "rechazado"]) }))
     .mutation(({ ctx, input }) =>
-      tenantTx(ctx, (tx) => tx.rawMaterialLot.update({ where: { id: input.id }, data: { status: input.status } })),
+      tenantTx(ctx, async (tx) => {
+        const { count } = await tx.rawMaterialLot.updateMany({
+          where: { id: input.id, status: "cuarentena" },
+          data: { status: input.status },
+        });
+        if (count === 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "El lote no existe o ya no está en cuarentena.",
+          });
+        }
+        return tx.rawMaterialLot.findUniqueOrThrow({ where: { id: input.id } });
+      }),
     ),
   listLots: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin").query(
     ({ ctx }) =>
