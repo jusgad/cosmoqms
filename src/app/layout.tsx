@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Fira_Code, Fira_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -25,8 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${firaSans.variable} ${firaCode.variable}`}>
-      <body className="bg-background font-sans text-foreground antialiased">{children}</body>
-    </html>
+    <ClerkProvider>
+      <html lang="es" className={`${firaSans.variable} ${firaCode.variable}`}>
+        <body className="bg-background font-sans text-foreground antialiased">{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }
