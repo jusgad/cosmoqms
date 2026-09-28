@@ -8,7 +8,7 @@ import { QrCode } from "lucide-react";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
-import { receiveLotInput } from "@/lib/trpc/router/materials";
+import { receiveLotInput } from "@/lib/validation/materials";
 
 type ReceiveLotFormValues = z.infer<typeof receiveLotInput>;
 
