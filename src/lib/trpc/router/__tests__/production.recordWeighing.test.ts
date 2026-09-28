@@ -4,15 +4,20 @@ import type { Prisma } from "@prisma/client";
 // Zero-`any` precedent (Tasks 6-9): mocks are typed against the actual
 // Prisma delegate call shapes rather than using `any`.
 type CreateArgs = Prisma.BatchEventCreateArgs;
-type UpdateArgs = Prisma.ProductionOrderUpdateArgs;
 
 const create = vi.fn(async (args: CreateArgs) => ({ id: "ev1", ...args.data }));
 const findUniqueOrThrow = vi.fn(async () => ({ id: "po1", status: "planificado" as const }));
-const update = vi.fn(async (args: UpdateArgs) => ({ id: "po1", status: args.data.status }));
+// Review round 1 fix (Finding 2, TOCTOU guard): `advanceStageInternal` now
+// pins its write with `updateMany({ where: { id, status: from } })` instead
+// of a bare `update`, so the mock must provide `updateMany` returning a
+// `{ count }` — `1` here simulates the common case where nothing else raced
+// this transaction. The call args are asserted via `toHaveBeenCalledWith`
+// below, not read inside the mock, so no parameter is declared here.
+const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
-    fn({ batchEvent: { create }, productionOrder: { findUniqueOrThrow, update } }),
+    fn({ batchEvent: { create }, productionOrder: { findUniqueOrThrow, updateMany } }),
 }));
 
 import { productionRouter } from "../production";
@@ -36,6 +41,11 @@ describe("production.recordWeighing", () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ eventType: "weighing" }) }),
     );
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "pesado" } }));
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "550e8400-e29b-41d4-a716-446655440000", status: "planificado" },
+        data: { status: "pesado" },
+      }),
+    );
   });
 });

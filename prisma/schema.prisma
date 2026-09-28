@@ -193,6 +193,16 @@ model BatchSignature {
   reauthVerified    Boolean         @map("reauth_verified")
   order             ProductionOrder @relation(fields: [productionOrderId], references: [id])
 
+  // Review round 1 fix (task 11, Finding 2 — TOCTOU race backstop): two
+  // near-simultaneous `production.sign` calls for the same order+stage could
+  // both pass `advanceStageInternal`'s in-transaction `canTransition` check
+  // before either commits (the app-level fix is `advanceStageInternal`'s
+  // `updateMany({ where: { id, status: from } })` guard in production.ts).
+  // This unique constraint is the database-level backstop: even if the
+  // application guard were ever bypassed or raced in a way the transaction
+  // isolation level doesn't catch, the database itself refuses a second
+  // `BatchSignature` for the same (order, stage) pair.
+  @@unique([productionOrderId, stage])
   @@map("batch_signatures")
 }
 

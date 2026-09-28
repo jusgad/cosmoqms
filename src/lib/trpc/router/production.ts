@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { auth } from "@clerk/nextjs/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { canTransition, nextStage } from "@/lib/production/stateMachine";
 import { generateOrderNumber } from "@/lib/production/generateOrderNumber";
@@ -124,10 +125,34 @@ export const productionRouter = router({
   // TODO(Task 17): audit_log write via Prisma extension — writes to two
   // regulated tables (batch_signatures, batch_events) plus a possible
   // production_orders status update; same deferral as Tasks 7-10's routers.
+  //
+  // Review round 1 fix (Finding 1, user decision: fix now): `signInput`'s
+  // `reauthVerified: z.literal(true)` only guarantees the CLIENT claimed
+  // step-up succeeded — it says nothing about whether Clerk's server actually
+  // agrees the current session satisfies reverification. Anyone hitting this
+  // tRPC endpoint directly (bypassing `SignaturePad`/`useReverification`)
+  // could send `reauthVerified: true` without ever completing step-up. Fixed
+  // by independently re-checking with Clerk's own server-side `auth()` — the
+  // same primitive `getCurrentUser` (`@/lib/auth.ts`) calls internally, and
+  // the same `has({ reverification })` shape verified against the installed
+  // `@clerk/nextjs@7.9.7`/`@clerk/shared@4.36.0` types for
+  // `verifyReauthForSignature` (`firma/actions.ts`). Both the client-sent
+  // `reauthVerified` (via `signInput`'s Zod guarantee) and this independent
+  // server-side check must pass — belt and suspenders — but this check is
+  // the one that actually carries the regulatory guarantee, since the
+  // client-sent boolean alone is not trustworthy.
   sign: roleProcedure("operario", "jefe_planta", "calidad", "director_tecnico")
     .input(signInput)
-    .mutation(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
+    .mutation(async ({ ctx, input }) => {
+      const { has } = await auth();
+      if (!has({ reverification: "strict" })) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Se requiere reautenticación (verificación de identidad) para firmar",
+        });
+      }
+
+      return tenantTx(ctx, async (tx) => {
         const order = await tx.productionOrder.findUniqueOrThrow({ where: { id: input.productionOrderId } });
         if (order.status !== input.stage) {
           throw new TRPCError({
@@ -164,8 +189,8 @@ export const productionRouter = router({
         }
 
         return signature;
-      }),
-    ),
+      });
+    }),
 });
 
 // Exported (not a public procedure) so Tasks 10-13 call it from inside their
@@ -181,6 +206,19 @@ export const productionRouter = router({
 // signatures via a scratch tsc --noEmit check before adopting them here —
 // they resolve to `Prisma.TransactionClient` and `BatchStatus` respectively
 // and typecheck cleanly, so no deviation was needed.
+//
+// Review round 1 fix (Finding 2 — TOCTOU race): the original read-then-update
+// pinned nothing, so two near-simultaneous callers (now that `sign` is a
+// second call site alongside `recordWeighing`) could both pass the
+// `canTransition` check on the same stale `order.status` before either write
+// committed. Fixed the same way `materials.ts`'s `setStatus` guards its own
+// state transition (task-7 precedent): fold the just-read `from` status into
+// the `update`'s own `where` clause via `updateMany`, so the read-check-write
+// is pinned atomically. If the row the transaction is pinned to has already
+// moved (lost the race, or someone else's `sign`/`recordWeighing` beat this
+// one to it), `count` is `0` and this throws a clear `CONFLICT`, matching
+// `setStatus`'s "0 rows affected" pattern, rather than silently overwriting
+// stale data.
 export async function advanceStageInternal(
   tx: Parameters<Parameters<typeof tenantTx>[1]>[0],
   orderId: string,
@@ -190,5 +228,15 @@ export async function advanceStageInternal(
   if (!canTransition(order.status, to)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: `No se puede pasar de ${order.status} a ${to}` });
   }
-  return tx.productionOrder.update({ where: { id: orderId }, data: { status: to } });
+  const { count } = await tx.productionOrder.updateMany({
+    where: { id: orderId, status: order.status },
+    data: { status: to },
+  });
+  if (count === 0) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: `La orden ya no está en '${order.status}' — otra operación cambió su etapa`,
+    });
+  }
+  return tx.productionOrder.findUniqueOrThrow({ where: { id: orderId } });
 }
