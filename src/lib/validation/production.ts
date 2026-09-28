@@ -13,3 +13,17 @@ export const createProductionOrderInput = z.object({
 });
 
 export type CreateProductionOrderValues = z.infer<typeof createProductionOrderInput>;
+
+// Shared with WeighingForm.tsx (Task 10, Client Component) for the exact
+// same bundle-safety reason documented above — the form imports this schema
+// directly, never the router file.
+export const recordWeighingInput = z.object({
+  productionOrderId: z.string().uuid(),
+  rawMaterialLotId: z.string().uuid(),
+  theoreticalQty: z.number().positive(),
+  actualQty: z.number().positive(),
+  clientEventId: z.string().uuid(),
+  occurredAt: z.string(),
+});
+
+export type RecordWeighingValues = z.infer<typeof recordWeighingInput>;

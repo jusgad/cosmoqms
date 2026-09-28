@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { canTransition } from "@/lib/production/stateMachine";
 import { generateOrderNumber } from "@/lib/production/generateOrderNumber";
-import { createProductionOrderInput } from "@/lib/validation/production";
+import { createProductionOrderInput, recordWeighingInput } from "@/lib/validation/production";
 
 export const productionRouter = router({
   // NOTE: kept the brief's literal `orderBy: { createdBy: "asc" }` (Step 7)
@@ -55,6 +55,36 @@ export const productionRouter = router({
             status: "planificado",
           },
         });
+      }),
+    ),
+  // Non-negotiable (CLAUDE.md rule 1): `batch_events` is append-only — this
+  // procedure only ever `create`s a BatchEvent row, never updates/deletes
+  // one. Non-negotiable (CLAUDE.md rule 7): the stage transition is never a
+  // direct `status` write — it goes through `advanceStageInternal`, which
+  // re-validates the transition server-side via `canTransition`.
+  // TODO(Task 17): audit_log write via Prisma extension — this writes to two
+  // regulated tables (batch_events, production_orders); same deferral as
+  // Tasks 7-9's routers.
+  recordWeighing: roleProcedure("operario", "jefe_planta")
+    .input(recordWeighingInput)
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        await tx.batchEvent.create({
+          data: {
+            tenantId: ctx.user.tenantId,
+            productionOrderId: input.productionOrderId,
+            eventType: "weighing",
+            payload: {
+              rawMaterialLotId: input.rawMaterialLotId,
+              theoreticalQty: input.theoreticalQty,
+              actualQty: input.actualQty,
+            },
+            actorUserId: ctx.user.id,
+            occurredAt: new Date(input.occurredAt),
+            clientEventId: input.clientEventId,
+          },
+        });
+        return advanceStageInternal(tx, input.productionOrderId, "pesado");
       }),
     ),
 });
