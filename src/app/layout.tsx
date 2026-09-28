@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Fira_Code, Fira_Sans } from "next/font/google";
+import { TRPCProvider } from "@/lib/trpc/client";
 import "./globals.css";
 
 const firaSans = Fira_Sans({
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="es" className={`${firaSans.variable} ${firaCode.variable}`}>
-        <body className="bg-background font-sans text-foreground antialiased">{children}</body>
+        <body className="bg-background font-sans text-foreground antialiased">
+          <TRPCProvider>{children}</TRPCProvider>
+        </body>
       </html>
     </ClerkProvider>
   );
