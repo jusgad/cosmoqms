@@ -95,18 +95,18 @@
   --card-foreground: #e5e7eb;
   --popover: #111827;
   --popover-foreground: #e5e7eb;
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+  --primary: #0891B2;
+  --primary-foreground: #FFFFFF;
+  --secondary: #22D3EE;
+  --secondary-foreground: #134E4A;
   --muted: oklch(0.269 0 0);
   --muted-foreground: #9ca3af; /* #475569 fails 4.5:1 on #0B1120 — lighter slate keeps the contrast rule */
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: #DC2626;
   --border: #1f2937;
   --input: #1f2937;
-  --ring: oklch(0.556 0 0);
+  --ring: #0891B2;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
