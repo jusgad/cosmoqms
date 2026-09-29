@@ -33,6 +33,12 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { ToleranceIndicator } from "@/components/batch/ToleranceIndicator";
 import { recordWeighingInput, type RecordWeighingValues } from "@/lib/validation/production";
+// Task 14 (queue-first submit): both are browser-only Dexie/localStorage
+// modules with zero Prisma dependency, so importing them directly here keeps
+// the same bundle-safety guarantee documented above — never a value-import
+// from `@/lib/trpc/router/*`.
+import { queueEvent, syncPendingEvents } from "@/lib/offline/sync-engine";
+import { getDeviceId } from "@/lib/offline/device";
 
 type FormulaIngredientProp = { rawMaterialId: string; percentage: number };
 
@@ -56,7 +62,7 @@ export function WeighingForm({
   const [serverError, setServerError] = useState<string | null>(null);
 
   const lotsQuery = trpc.materials.listLots.useQuery();
-  const recordWeighing = trpc.production.recordWeighing.useMutation();
+  const [isSubmittingQueue, setIsSubmittingQueue] = useState(false);
 
   const {
     register,
@@ -84,29 +90,55 @@ export function WeighingForm({
     return (ingredient.percentage / 100) * plannedQuantity;
   }, [lots, selectedLotId, ingredients, plannedQuantity]);
 
+  // Queue-first submit (Task 14): the write always succeeds locally — it is
+  // appended to the Dexie `pendingEvents` queue — even if the immediate sync
+  // attempt below fails or the device is offline. `OfflineIndicator`'s live
+  // queue-depth count and its own `online` listener (which also calls
+  // `syncPendingEvents()`) are what eventually get this event to the server;
+  // this optimistic call is just a same-tick "try now if we can" attempt,
+  // never the only chance the event gets to sync. This is why `WeighingForm`
+  // never calls `production.recordWeighing`/`fetch` directly any more — see
+  // the architecture-gap resolution in `app/api/sync/events/route.ts` for why
+  // the sync route (not this form) is now responsible for calling
+  // `advanceStageInternal` once the event actually reaches the server.
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
     if (theoreticalQty === null) {
       setServerError("Seleccione un lote correspondiente a un ingrediente de la fórmula.");
       return;
     }
+    setIsSubmittingQueue(true);
     try {
-      await recordWeighing.mutateAsync({
-        productionOrderId,
-        rawMaterialLotId: values.rawMaterialLotId,
-        theoreticalQty,
-        actualQty: values.actualQty,
+      await queueEvent({
         clientEventId: crypto.randomUUID(),
+        productionOrderId,
+        eventType: "weighing",
+        payload: {
+          rawMaterialLotId: values.rawMaterialLotId,
+          theoreticalQty,
+          actualQty: values.actualQty,
+        },
         occurredAt: new Date().toISOString(),
+        deviceId: getDeviceId(),
       });
+
+      if (navigator.onLine) {
+        // Best-effort: a failure here (network flake, server down) is not
+        // surfaced as a form error — the event is already safely queued and
+        // will be retried by `OfflineIndicator`'s `online` listener.
+        await syncPendingEvents().catch(() => undefined);
+      }
+
       router.push(`/produccion/${productionOrderId}`);
       router.refresh();
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Error al registrar el pesaje");
+    } finally {
+      setIsSubmittingQueue(false);
     }
   });
 
-  const isSaving = isSubmitting || recordWeighing.isPending;
+  const isSaving = isSubmitting || isSubmittingQueue;
 
   return (
     <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-4">
