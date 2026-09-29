@@ -53,6 +53,16 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
       {user.role === "director_tecnico" && order.status === "calidad" && (
         <Button render={<Link href={`/produccion/${order.id}/liberar`}>Liberar lote</Link>} />
       )}
+      {/* Task 13 review round 1 (Critical finding fix): entry point into
+          `deviations.create` — gated client-side to the same roles
+          `deviations.create`'s `roleProcedure` allows server-side
+          (`nueva/page.tsx` re-checks this, same pattern as `liberar/page.tsx`). */}
+      {["calidad", "jefe_planta", "operario"].includes(user.role) && (
+        <Button
+          variant="outline"
+          render={<Link href={`/produccion/${order.id}/desviacion/nueva`}>Reportar desviación</Link>}
+        />
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="font-sans text-lg font-semibold text-foreground">Eventos del lote</h2>

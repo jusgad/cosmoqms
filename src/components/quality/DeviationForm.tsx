@@ -1,14 +1,22 @@
 "use client";
 
 // Client Component: capturing investigation/corrective-action text and
-// submitting tRPC mutations requires real interactivity (useState +
-// useMutation) — same reasoning as QCResultForm.tsx (Task 12).
+// submitting tRPC mutations requires real interactivity — same reasoning as
+// QCResultForm.tsx (Task 12).
 //
 // Bundle-safety (Task 7 lesson, applied again here): this file imports its
-// input schemas from `@/lib/validation/deviations` (schema-only, zero
+// input schema from `@/lib/validation/deviations` (schema-only, zero
 // dependency on `@/lib/trpc/trpc`/`@/lib/db`) and never imports anything from
 // `@/lib/trpc/router/deviations` (the router file), which would drag
 // `PrismaClient` into the browser bundle.
+//
+// Task 13 review round 1 (Sebas's decision — two-step investigation for
+// audit-trail granularity): this form now exposes THREE distinct actions
+// depending on `deviation.status`: "Iniciar investigación" (abierta ->
+// en_investigacion, no content yet), the investigation + corrective-action
+// form (en_investigacion -> pendiente_aprobacion, only enabled once the
+// investigation has actually started), and "Aprobar y cerrar" (pendiente_aprobacion
+// -> cerrada, director_tecnico only).
 //
 // Non-negotiable (task-13-brief.md, mirrored from qc.release/Task 12): the
 // "Aprobar" button is only ever RENDERED when `userRole === "director_tecnico"`
@@ -22,7 +30,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
-import { investigateDeviationInput } from "@/lib/validation/deviations";
+import { submitInvestigationInput } from "@/lib/validation/deviations";
 import type { Role } from "@prisma/client";
 
 const textareaClasses =
@@ -42,7 +50,11 @@ export function DeviationForm({ deviation, userRole }: { deviation: DeviationDet
   const [correctiveAction, setCorrectiveAction] = useState(deviation.correctiveAction ?? "");
   const [error, setError] = useState<string | null>(null);
 
-  const investigate = trpc.deviations.investigate.useMutation({
+  const startInvestigation = trpc.deviations.startInvestigation.useMutation({
+    onSuccess: () => router.refresh(),
+    onError: (mutationError) => setError(mutationError.message),
+  });
+  const submitInvestigation = trpc.deviations.submitInvestigation.useMutation({
     onSuccess: () => router.refresh(),
     onError: (mutationError) => setError(mutationError.message),
   });
@@ -51,14 +63,20 @@ export function DeviationForm({ deviation, userRole }: { deviation: DeviationDet
     onError: (mutationError) => setError(mutationError.message),
   });
 
-  const canEditInvestigation = deviation.status === "abierta" || deviation.status === "en_investigacion";
+  const canStartInvestigation = deviation.status === "abierta";
+  const canSubmitInvestigation = deviation.status === "en_investigacion";
   const canApprove = userRole === "director_tecnico" && deviation.status === "pendiente_aprobacion";
+
+  const handleStartInvestigation = async () => {
+    setError(null);
+    await startInvestigation.mutateAsync({ id: deviation.id });
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
-    const parsed = investigateDeviationInput.safeParse({
+    const parsed = submitInvestigationInput.safeParse({
       id: deviation.id,
       investigation: investigation.trim(),
       correctiveAction: correctiveAction.trim(),
@@ -68,7 +86,7 @@ export function DeviationForm({ deviation, userRole }: { deviation: DeviationDet
       return;
     }
 
-    await investigate.mutateAsync(parsed.data);
+    await submitInvestigation.mutateAsync(parsed.data);
   };
 
   const handleApprove = async () => {
@@ -78,7 +96,26 @@ export function DeviationForm({ deviation, userRole }: { deviation: DeviationDet
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
-      {canEditInvestigation ? (
+      {deviation.status === "abierta" && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">
+            La desviación está abierta. Inicie la investigación para registrar quién y cuándo la atendió.
+          </p>
+          {/* Client-side gate mirroring `startInvestigation`'s server-side
+              `roleProcedure("calidad")` — never the only enforcement. */}
+          {userRole === "calidad" && (
+            <Button
+              type="button"
+              onClick={handleStartInvestigation}
+              disabled={!canStartInvestigation || startInvestigation.isPending}
+            >
+              {startInvestigation.isPending ? "Iniciando..." : "Iniciar investigación"}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {canSubmitInvestigation && userRole === "calidad" && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`investigation-${deviation.id}`} className="text-sm font-medium text-foreground">
@@ -104,11 +141,13 @@ export function DeviationForm({ deviation, userRole }: { deviation: DeviationDet
             />
           </div>
 
-          <Button type="submit" disabled={investigate.isPending}>
-            {investigate.isPending ? "Enviando..." : "Enviar para aprobación"}
+          <Button type="submit" disabled={submitInvestigation.isPending}>
+            {submitInvestigation.isPending ? "Enviando..." : "Enviar para aprobación"}
           </Button>
         </form>
-      ) : (
+      )}
+
+      {(deviation.status === "pendiente_aprobacion" || deviation.status === "cerrada") && (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-foreground">Investigación</span>
