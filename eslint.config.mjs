@@ -12,7 +12,10 @@ const compat = new FlatCompat({
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
-    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts"],
+    // `public/sw.js` is Serwist's generated service worker bundle (from
+    // `src/app/sw.ts` via `swDest` in `next.config.ts`) — a build artifact,
+    // not source, and already gitignored; it should never be linted.
+    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "public/sw.js"],
   },
 ];
 
