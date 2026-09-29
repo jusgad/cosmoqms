@@ -17,10 +17,18 @@ vi.mock("../db", () => ({
   },
 }));
 
-const fetchMock = vi.fn(async () => ({
-  ok: true,
-  json: async () => ({ success: true, results: [{ clientEventId: "e1", status: "accepted" }] }),
-}));
+type MockFetchResponse = {
+  ok: boolean;
+  status?: number;
+  json: () => Promise<{ success: boolean; results: { clientEventId: string; status: string }[] }>;
+};
+
+const fetchMock = vi.fn(
+  async (): Promise<MockFetchResponse> => ({
+    ok: true,
+    json: async () => ({ success: true, results: [{ clientEventId: "e1", status: "accepted" }] }),
+  }),
+);
 vi.stubGlobal("fetch", fetchMock);
 
 import { queueEvent, syncPendingEvents } from "../sync-engine";
@@ -76,5 +84,65 @@ describe("sync-engine", () => {
     expect(result.pushed).toBe(0);
     expect(result.duplicates).toBe(1);
     expect(events[0].pushedAt).toBeDefined();
+  });
+
+  // Review round 1 fix (Important Finding 2): a 4xx means the server
+  // explicitly rejected the batch (bad auth, malformed event) — not "try
+  // again later." This must be distinguishable from a transient/offline
+  // failure so `OfflineIndicator` can surface it instead of looking
+  // identical to "still pending."
+  it("marks events failedAt on a 4xx rejection instead of leaving them silently pending", async () => {
+    events.push({
+      clientEventId: "e1",
+      productionOrderId: "po1",
+      eventType: "weighing",
+      payload: {},
+      occurredAt: "now",
+      deviceId: "d1",
+    });
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ success: false, results: [] }) });
+
+    const result = await syncPendingEvents();
+
+    expect(result.failed).toBe(1);
+    expect(result.pushed).toBe(0);
+    expect(events[0].failedAt).toBeDefined();
+    expect(events[0].pushedAt).toBeUndefined();
+  });
+
+  it("never resends an already-failed event on a later sync attempt", async () => {
+    events.push({
+      clientEventId: "e1",
+      productionOrderId: "po1",
+      eventType: "weighing",
+      payload: {},
+      occurredAt: "now",
+      deviceId: "d1",
+      failedAt: new Date().toISOString(),
+      lastError: "HTTP 403",
+    });
+
+    const result = await syncPendingEvents();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ pushed: 0, duplicates: 0, failed: 0 });
+  });
+
+  it("leaves events pending (not failed) on a transient network error", async () => {
+    events.push({
+      clientEventId: "e1",
+      productionOrderId: "po1",
+      eventType: "weighing",
+      payload: {},
+      occurredAt: "now",
+      deviceId: "d1",
+    });
+    fetchMock.mockRejectedValueOnce(new Error("network unreachable"));
+
+    const result = await syncPendingEvents();
+
+    expect(result).toEqual({ pushed: 0, duplicates: 0, failed: 0 });
+    expect(events[0].failedAt).toBeUndefined();
+    expect(events[0].pushedAt).toBeUndefined();
   });
 });
