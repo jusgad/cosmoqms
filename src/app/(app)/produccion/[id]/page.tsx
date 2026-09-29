@@ -46,6 +46,13 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
       {["pesado", "mezclado", "envasado", "calidad"].includes(order.status) && (
         <Button render={<Link href={`/produccion/${order.id}/firma`}>Firmar</Link>} />
       )}
+      {/* Task 12 review round 1: the only entry point into `qc.release`
+          ("firma final" per Blueprint Section 8) — gated to director_tecnico
+          at the `calidad` stage, matching the guard `liberar/page.tsx` itself
+          re-checks server-side. */}
+      {user.role === "director_tecnico" && order.status === "calidad" && (
+        <Button render={<Link href={`/produccion/${order.id}/liberar`}>Liberar lote</Link>} />
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="font-sans text-lg font-semibold text-foreground">Eventos del lote</h2>
