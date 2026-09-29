@@ -12,16 +12,25 @@ export const createDeviationInput = z.object({
 
 export type CreateDeviationValues = z.infer<typeof createDeviationInput>;
 
-// See deviations.ts (task-13-brief.md investigation) for why `investigate`
-// is a single step (open -> submit investigation + corrective action ->
-// pendiente_aprobacion) rather than a separate "start investigation" call.
-export const investigateDeviationInput = z.object({
+// Task 13 review round 1 (Sebas's decision): the investigation is now a
+// TWO-step flow for audit-trail granularity — `startInvestigation` (no body
+// beyond the id) marks who/when the investigation began (`abierta ->
+// en_investigacion`), and `submitInvestigation` (below) records the
+// documentation and moves to `pendiente_aprobacion`. See deviations.ts for
+// the full reasoning.
+export const startInvestigationInput = z.object({
+  id: z.string().uuid(),
+});
+
+export type StartInvestigationValues = z.infer<typeof startInvestigationInput>;
+
+export const submitInvestigationInput = z.object({
   id: z.string().uuid(),
   investigation: z.string().min(10, "Documente la investigación con al menos 10 caracteres"),
   correctiveAction: z.string().min(10, "Documente la acción correctiva con al menos 10 caracteres"),
 });
 
-export type InvestigateDeviationValues = z.infer<typeof investigateDeviationInput>;
+export type SubmitInvestigationValues = z.infer<typeof submitInvestigationInput>;
 
 export const approveDeviationInput = z.object({
   id: z.string().uuid(),

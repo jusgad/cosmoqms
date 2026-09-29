@@ -1,6 +1,11 @@
 import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
-import { createDeviationInput, investigateDeviationInput, approveDeviationInput } from "@/lib/validation/deviations";
+import {
+  createDeviationInput,
+  startInvestigationInput,
+  submitInvestigationInput,
+  approveDeviationInput,
+} from "@/lib/validation/deviations";
 import { z } from "zod";
 
 // Design investigation (task-13-brief.md's own header flags this as a real
@@ -24,25 +29,27 @@ import { z } from "zod";
 //    `close` step; today it would be untestable dead code, which the brief's
 //    own investigation prompt warns against.
 //
-// 2) `investigate` skipping `en_investigacion` — kept as the brief's literal
-//    single-step "submit investigation + corrective action for approval"
-//    action (open -> pendiente_aprobacion in one call), for two reasons:
-//    (a) nothing downstream (Task 12's `qc.release` guard only ever checks
-//    `status !== "cerrada"`) reads or depends on `en_investigacion` as an
-//    intermediate state, so a separate "start investigation" mutation would
-//    add a state transition with no consumer in this build order; (b) the
-//    blueprint's 5-step flow ("detección -> investigación -> acción
-//    correctiva/preventiva -> aprobación -> cierre") describes the
-//    *documentation* content of a single investigation record (what
-//    happened, what corrective action was taken), not necessarily two
-//    separate button-clicks by `calidad` — one submission that carries both
-//    the investigation narrative and the corrective action is a defensible
-//    MVP simplification. `en_investigacion` remains a valid schema value
-//    (e.g. for a future "mark as being worked on" UI affordance) — the
-//    `investigate` mutation's TOCTOU-guarded `where` clause below accepts a
-//    deviation starting from either `abierta` OR `en_investigacion`, so nothing
-//    is precluded if a later task adds that intermediate step.
+// 2) `investigate` (originally a single step) — REVISED in task 13 review
+//    round 1 per Sebas's explicit decision: split into `startInvestigation`
+//    (`abierta -> en_investigacion`, records who/when investigation began)
+//    and `submitInvestigation` (`en_investigacion -> pendiente_aprobacion`,
+//    records the investigation narrative + corrective action). The original
+//    single-step version silently discarded exactly the audit-trail signal
+//    `en_investigacion` exists to provide — when investigation actually
+//    started and who started it — which matters for INVIMA audit review, so
+//    the two-step flow is the correct design, not just an alternative one.
+//    `Deviation.investigationStartedBy`/`investigationStartedAt` (added to
+//    the schema in this round) persist that moment; `schema.prisma`'s own
+//    comment documents why this was edited directly rather than via
+//    `prisma migrate dev` (Task 3/live DB still BLOCKED — same precedent as
+//    commit a2146d2's `@@unique([productionOrderId, stage])`).
 export const deviationsRouter = router({
+  // Not called from any Client Component — `desviaciones/page.tsx` and
+  // `[id]/page.tsx` read Prisma directly instead (CLAUDE.md's Data Flow
+  // rule: "Server Components leen directo de Prisma para listados/reportes",
+  // same as `qc.listPending`'s own precedent). Kept on the router for API
+  // completeness/testability (e.g. a future mobile client or offline sync
+  // consumer), same reasoning `qc.listPending` documents.
   list: roleProcedure("calidad", "director_tecnico", "jefe_planta", "operario").query(({ ctx }) =>
     tenantTx(ctx, (tx) =>
       tx.deviation.findMany({
@@ -68,23 +75,46 @@ export const deviationsRouter = router({
       ),
     ),
 
-  // Single-step submission (see file header, point 2): documents the
-  // investigation + corrective action and moves straight to
-  // `pendiente_aprobacion`. TOCTOU-guarded the same way
+  // Step 1 of 2 (task 13 review round 1, Sebas's decision): marks who/when
+  // the investigation actually started — `abierta -> en_investigacion` only,
+  // no documentation content yet. TOCTOU-guarded the same way
   // `production.ts`'s `advanceStageInternal` pins `ProductionOrder.status`:
-  // the `updateMany`'s `where` re-checks `status` is still one of the two
-  // valid starting states, so two concurrent submissions (or a resubmission
-  // after approval) can't silently clobber each other.
-  investigate: roleProcedure("calidad")
-    .input(investigateDeviationInput)
+  // the `updateMany`'s `where` re-checks the deviation is still `abierta`,
+  // so two `calidad` users racing to start the same investigation can't both
+  // "win" silently (the second gets CONFLICT).
+  startInvestigation: roleProcedure("calidad")
+    .input(startInvestigationInput)
     .mutation(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
         const { count } = await tx.deviation.updateMany({
-          where: {
-            id: input.id,
-            tenantId: ctx.user.tenantId,
-            status: { in: ["abierta", "en_investigacion"] },
+          where: { id: input.id, tenantId: ctx.user.tenantId, status: "abierta" },
+          data: {
+            status: "en_investigacion",
+            investigationStartedBy: ctx.user.id,
+            investigationStartedAt: new Date(),
           },
+        });
+        if (count === 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "La desviación no está en estado 'abierta'",
+          });
+        }
+        return tx.deviation.findUniqueOrThrow({ where: { id: input.id } });
+      }),
+    ),
+
+  // Step 2 of 2: documents the investigation + corrective action and moves
+  // to `pendiente_aprobacion`. Requires the deviation to already be
+  // `en_investigacion` (i.e. `startInvestigation` must have run first) —
+  // same TOCTOU-guarded `updateMany` pattern as `startInvestigation`/
+  // `approve` below.
+  submitInvestigation: roleProcedure("calidad")
+    .input(submitInvestigationInput)
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        const { count } = await tx.deviation.updateMany({
+          where: { id: input.id, tenantId: ctx.user.tenantId, status: "en_investigacion" },
           data: {
             investigation: input.investigation,
             correctiveAction: input.correctiveAction,
@@ -94,7 +124,7 @@ export const deviationsRouter = router({
         if (count === 0) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "La desviación no está en un estado que permita registrar la investigación",
+            message: "La desviación no está en estado 'en_investigacion' — inicie la investigación primero",
           });
         }
         return tx.deviation.findUniqueOrThrow({ where: { id: input.id } });
@@ -105,8 +135,9 @@ export const deviationsRouter = router({
   // deviation's CAPA is server-gated to `director_tecnico` via `roleProcedure`
   // — this is the actual enforcement boundary; any client-side gate (the
   // "Aprobar" button in DeviationForm.tsx) is a UX convenience only, per the
-  // `qc.release` precedent (Task 12). Same TOCTOU pattern as `investigate`:
-  // only a deviation still `pendiente_aprobacion` can be approved.
+  // `qc.release` precedent (Task 12). Same TOCTOU pattern as
+  // `startInvestigation`/`submitInvestigation`: only a deviation still
+  // `pendiente_aprobacion` can be approved.
   approve: roleProcedure("director_tecnico")
     .input(approveDeviationInput)
     .mutation(({ ctx, input }) =>

@@ -96,15 +96,49 @@ describe("deviations.create", () => {
   });
 });
 
-describe("deviations.investigate", () => {
+// Task 13 review round 1 (Sebas's decision): `investigate` split into two
+// steps for audit-trail granularity. Each boundary gets its own role-gate,
+// happy-path, and TOCTOU-guard coverage.
+describe("deviations.startInvestigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updateManyCount = 1;
   });
 
-  it("rejects investigate from a role other than calidad", async () => {
+  it("rejects startInvestigation from a role other than calidad", async () => {
     await expect(
-      caller("operario").investigate({
+      caller("operario").startInvestigation({ id: "550e8400-e29b-41d4-a716-446655440000" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("moves abierta -> en_investigacion, recording who/when it started", async () => {
+    const result = await caller("calidad").startInvestigation({ id: "550e8400-e29b-41d4-a716-446655440000" });
+    expect(deviationUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "abierta" }),
+        data: expect.objectContaining({ status: "en_investigacion", investigationStartedBy: "u1" }),
+      }),
+    );
+    expect(result.id).toBe("dev1");
+  });
+
+  it("throws CONFLICT (TOCTOU guard) when the deviation is not abierta", async () => {
+    updateManyCount = 0;
+    await expect(
+      caller("calidad").startInvestigation({ id: "550e8400-e29b-41d4-a716-446655440000" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+describe("deviations.submitInvestigation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateManyCount = 1;
+  });
+
+  it("rejects submitInvestigation from a role other than calidad", async () => {
+    await expect(
+      caller("operario").submitInvestigation({
         id: "550e8400-e29b-41d4-a716-446655440000",
         investigation: "0123456789",
         correctiveAction: "0123456789",
@@ -112,25 +146,25 @@ describe("deviations.investigate", () => {
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("submits investigation + corrective action, moving to pendiente_aprobacion", async () => {
-    const result = await caller("calidad").investigate({
+  it("submits investigation + corrective action, moving en_investigacion -> pendiente_aprobacion", async () => {
+    const result = await caller("calidad").submitInvestigation({
       id: "550e8400-e29b-41d4-a716-446655440000",
       investigation: "0123456789",
       correctiveAction: "0123456789",
     });
     expect(deviationUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: { in: ["abierta", "en_investigacion"] } }),
+        where: expect.objectContaining({ status: "en_investigacion" }),
         data: expect.objectContaining({ status: "pendiente_aprobacion" }),
       }),
     );
     expect(result.id).toBe("dev1");
   });
 
-  it("throws CONFLICT (TOCTOU guard) when the deviation is not abierta/en_investigacion", async () => {
+  it("throws CONFLICT (TOCTOU guard) when the deviation is not en_investigacion", async () => {
     updateManyCount = 0;
     await expect(
-      caller("calidad").investigate({
+      caller("calidad").submitInvestigation({
         id: "550e8400-e29b-41d4-a716-446655440000",
         investigation: "0123456789",
         correctiveAction: "0123456789",

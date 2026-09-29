@@ -258,6 +258,21 @@ model Deviation {
   correctiveAction  String?         @map("corrective_action")
   status            DeviationStatus @default(abierta)
   raisedBy          String          @map("raised_by")
+  // Task 13 review round 1 (user decision: split `investigate` into two
+  // steps for audit-trail granularity): records who started the
+  // investigation and when the `abierta -> en_investigacion` transition
+  // happened, since INVIMA audit review needs that timestamp/actor, not just
+  // the later `pendiente_aprobacion` submission. Nullable/optional the same
+  // way `approvedBy`/`approvedAt` are — set only once `startInvestigation`
+  // runs. Same as `a2146d2`'s precedent (task 11 review round 1's
+  // `@@unique([productionOrderId, stage])`): edited directly in schema.prisma
+  // without running `prisma migrate dev`, since Task 3 (Supabase/RLS, live
+  // DB) remains BLOCKED — the actual migration is deferred until Task 3
+  // unblocks; `prisma generate` (client codegen only, no DB connection
+  // needed) is run instead so the typed Prisma Client used by
+  // `deviations.ts`/tests reflects these fields now.
+  investigationStartedBy String?   @map("investigation_started_by")
+  investigationStartedAt DateTime? @map("investigation_started_at")
   approvedBy        String?         @map("approved_by")
   approvedAt        DateTime?       @map("approved_at")
   tenant            Organization    @relation(fields: [tenantId], references: [id])
