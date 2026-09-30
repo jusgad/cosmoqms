@@ -4,10 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { QrCode } from "lucide-react";
+import { ScanLineIcon } from "lucide-react";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { QRScanner } from "@/components/batch/QRScanner";
 import { receiveLotInput } from "@/lib/validation/materials";
 
 type ReceiveLotFormValues = z.infer<typeof receiveLotInput>;
@@ -17,14 +25,27 @@ export type RawMaterialOption = { id: string; code: string; name: string };
 export function ReceiveLotForm({ materials }: { materials: RawMaterialOption[] }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ReceiveLotFormValues>({
     resolver: zodResolver(receiveLotInput),
   });
+
+  // Integration detail #2 (Task 15 brief): unlike `WeighingForm`, there is no
+  // existing lot to look up here — this form receives a brand-new lot, so a
+  // successful scan is purely a pre-fill convenience for the one field the
+  // supplier's own barcode/QR maps to (`supplierProvidedCode`, per Task 7's
+  // design). It never touches `supplierLotCode` (the lab's own manually
+  // entered lot code) and never tries to search/match against any list.
+  function handleDecode(code: string) {
+    setValue("supplierProvidedCode", code, { shouldValidate: true });
+    setScannerOpen(false);
+  }
 
   const receiveLot = trpc.materials.receiveLot.useMutation({
     onSuccess: (lot) => {
@@ -66,32 +87,26 @@ export function ReceiveLotForm({ materials }: { materials: RawMaterialOption[] }
         <label htmlFor="supplierLotCode" className="text-sm font-medium text-foreground">
           Código de lote del proveedor
         </label>
-        <div className="flex gap-2">
-          <input
-            id="supplierLotCode"
-            {...register("supplierLotCode")}
-            className="h-11 flex-1 rounded-lg border border-border bg-card px-3 font-mono text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled
-            aria-label="Escanear código (disponible próximamente)"
-            title="Escanear con cámara — se habilita en la Tarea 15 (QRScanner). La captura manual funciona hoy sin depender del escáner."
-          >
-            <QrCode className="size-5" aria-hidden />
-          </Button>
-        </div>
+        <input
+          id="supplierLotCode"
+          {...register("supplierLotCode")}
+          className="h-11 rounded-lg border border-border bg-card px-3 font-mono text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
         {errors.supplierLotCode && (
           <p className="text-sm text-destructive">{errors.supplierLotCode.message}</p>
         )}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="supplierProvidedCode" className="text-sm font-medium text-foreground">
-          Código del proveedor (opcional)
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="supplierProvidedCode" className="text-sm font-medium text-foreground">
+            Código del proveedor (opcional)
+          </label>
+          <Button type="button" variant="outline" size="sm" onClick={() => setScannerOpen(true)}>
+            <ScanLineIcon data-icon="inline-start" />
+            Escanear
+          </Button>
+        </div>
         <input
           id="supplierProvidedCode"
           {...register("supplierProvidedCode", {
@@ -100,10 +115,25 @@ export function ReceiveLotForm({ materials }: { materials: RawMaterialOption[] }
           className="h-11 rounded-lg border border-border bg-card px-3 font-mono text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
         <p className="text-sm text-muted-foreground">
-          Si el proveedor no entrega un código propio, CosmoQMS genera uno interno automáticamente al recibir el
-          lote.
+          Atajo opcional: si el empaque trae un código de barras/QR propio del proveedor,
+          &ldquo;Escanear&rdquo; lo copia aquí. Si el proveedor no entrega uno, CosmoQMS genera un
+          código interno automáticamente al recibir el lote — este campo nunca bloquea la recepción
+          manual.
         </p>
       </div>
+
+      <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Escanear código del proveedor</DialogTitle>
+            <DialogDescription>
+              Apunte la cámara al código de barras o QR del empaque. Puede cerrar esto en cualquier
+              momento y escribir el código manualmente.
+            </DialogDescription>
+          </DialogHeader>
+          {scannerOpen && <QRScanner onDecode={handleDecode} onClose={() => setScannerOpen(false)} />}
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor="quantityReceived" className="text-sm font-medium text-foreground">

@@ -18,20 +18,29 @@
 // material the selected lot belongs to — so it updates live as the operator
 // picks a different lot, with no extra round trip.
 //
-// Lot selection: the brief's Step 7 calls for "a plain searchable <select>
-// fed by materials.list" until the real `LotManualSearch` component lands in
-// Task 15. This fetches `materials.listLots` (includes `rawMaterial`) via
-// the tRPC React client and renders a native <select>, filtered to
-// `status === "liberado"` lots — a QMS lot can't be weighed for production
-// while still in quarantine or already rejected, matching the raw-material
-// quarantine/release flow from Task 7.
+// Lot selection (Task 15): `materials.listLots` (includes `rawMaterial`) is
+// filtered to `status === "liberado"` lots (Task 7's quarantine/release
+// flow). `LotManualSearch` is the default, always-visible picker (zero
+// camera dependency); `QRScanner` is an optional dialog shortcut that
+// resolves a decoded code to one of these same lots via the identical
+// `onSelect` path — submit never branches on which one was used.
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ScanLineIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ToleranceIndicator } from "@/components/batch/ToleranceIndicator";
+import { LotManualSearch, type LotOption } from "@/components/batch/LotManualSearch";
+import { QRScanner } from "@/components/batch/QRScanner";
 import { recordWeighingInput, type RecordWeighingValues } from "@/lib/validation/production";
 // Task 14 (queue-first submit): both are browser-only Dexie/localStorage
 // modules with zero Prisma dependency, so importing them directly here keeps
@@ -60,6 +69,8 @@ export function WeighingForm({
 }) {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const lotsQuery = trpc.materials.listLots.useQuery();
   const [isSubmittingQueue, setIsSubmittingQueue] = useState(false);
@@ -68,6 +79,7 @@ export function WeighingForm({
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(formInput),
@@ -79,8 +91,46 @@ export function WeighingForm({
     [lotsQuery.data],
   );
 
+  // Generic, Prisma-free shape `LotManualSearch` (and the scan-match lookup
+  // below) work with — keeps that leaf component decoupled from the
+  // tRPC-inferred `RawMaterialLot & { rawMaterial }` type.
+  const lotOptions = useMemo<LotOption[]>(
+    () =>
+      lots.map((lot) => ({
+        id: lot.id,
+        rawMaterialName: lot.rawMaterial.name,
+        supplierLotCode: lot.supplierLotCode,
+      })),
+    [lots],
+  );
+
   const selectedLotId = watch("rawMaterialLotId");
   const actualQty = watch("actualQty");
+  const selectedLot = lots.find((lot) => lot.id === selectedLotId) ?? null;
+
+  function selectLot(lot: LotOption) {
+    setScanError(null);
+    setValue("rawMaterialLotId", lot.id, { shouldValidate: true });
+  }
+
+  // `onDecode` hands back the raw decoded string (the lot's `qrCode` or a
+  // `supplierProvidedCode`). Resolve it against the same liberado-filtered
+  // `lots` and drive it through `selectLot`. An unmatched scan must not be a
+  // silent no-op — surface it so the operator falls back to
+  // `LotManualSearch`, never hidden behind this dialog.
+  function handleDecode(code: string) {
+    const match = lots.find((lot) => lot.qrCode === code || lot.supplierProvidedCode === code);
+    if (!match) {
+      setScanError(`No se encontró un lote liberado con el código "${code}".`);
+      return;
+    }
+    selectLot({
+      id: match.id,
+      rawMaterialName: match.rawMaterial.name,
+      supplierLotCode: match.supplierLotCode,
+    });
+    setScannerOpen(false);
+  }
 
   const theoreticalQty = useMemo(() => {
     const selectedLot = lots.find((lot) => lot.id === selectedLotId);
@@ -143,23 +193,48 @@ export function WeighingForm({
   return (
     <form onSubmit={onSubmit} className="flex max-w-lg flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="rawMaterialLotId" className="text-sm font-medium text-foreground">
-          Lote de materia prima
-        </label>
-        <select
-          id="rawMaterialLotId"
-          {...register("rawMaterialLotId")}
-          disabled={lotsQuery.isLoading}
-          className="h-11 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <option value="">Seleccionar...</option>
-          {lots.map((lot) => (
-            <option key={lot.id} value={lot.id}>
-              {lot.rawMaterial.name} — {lot.supplierLotCode}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="rawMaterialLotId" className="text-sm font-medium text-foreground">
+            Lote de materia prima
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setScanError(null);
+              setScannerOpen(true);
+            }}
+          >
+            <ScanLineIcon data-icon="inline-start" />
+            Escanear
+          </Button>
+        </div>
+
+        {/* Register a hidden field so react-hook-form/zod validates
+            `rawMaterialLotId` on submit even though it's now set via
+            `setValue` (from `LotManualSearch`/`QRScanner`), not by a native
+            input the user types into directly. */}
+        <input type="hidden" id="rawMaterialLotId" {...register("rawMaterialLotId")} />
+
+        {selectedLot ? (
+          <div className="flex min-h-[44px] items-center justify-between rounded-lg border border-border bg-muted px-3">
+            <span className="font-mono text-sm text-foreground">
+              {selectedLot.rawMaterial.name} — {selectedLot.supplierLotCode}
+            </span>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setValue("rawMaterialLotId", "")}>
+              Cambiar
+            </Button>
+          </div>
+        ) : (
+          // Non-negotiable (Blueprint, since Task 7): manual entry always
+          // works standalone — this is the default, always-visible picker,
+          // never blocked on or dependent on the scanner above.
+          <LotManualSearch lots={lotOptions} onSelect={selectLot} />
+        )}
+
         {errors.rawMaterialLotId && <p className="text-sm text-destructive">{errors.rawMaterialLotId.message}</p>}
+        {scanError && <p className="text-sm text-destructive">{scanError}</p>}
         {/* Task-10 review round 1 fix: a FORBIDDEN/network failure must be
             visible, not look identical to "no lots in inventory" — otherwise
             a future permission regression (like the operario-role gap this
@@ -172,6 +247,19 @@ export function WeighingForm({
           <p className="text-sm text-muted-foreground">No hay lotes liberados disponibles.</p>
         )}
       </div>
+
+      <Dialog open={scannerOpen} onOpenChange={setScannerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Escanear código del lote</DialogTitle>
+            <DialogDescription>
+              Apunte la cámara al código QR o de barras del lote. Puede cerrar esto en cualquier
+              momento y buscar el lote manualmente.
+            </DialogDescription>
+          </DialogHeader>
+          {scannerOpen && <QRScanner onDecode={handleDecode} onClose={() => setScannerOpen(false)} />}
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-foreground">Cantidad teórica</span>
