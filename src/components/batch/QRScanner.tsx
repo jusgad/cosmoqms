@@ -43,6 +43,19 @@ export function QRScanner({
 
   useEffect(() => {
     const scanner = new Html5Qrcode(elementId);
+    // Review round 1 (Critical) fix: `scanner.isScanning` only flips to
+    // `true` deep inside `start()`'s async chain (after `getUserMedia`
+    // already resolved and the camera stream is live), so a cleanup that
+    // only stops when `isScanning` is already `true` misses the window
+    // where unmount happens *during* that startup — `scanner.clear()`
+    // alone never touches the live `MediaStream`, so the camera would keep
+    // recording forever. `stopped` (checked both by the immediate cleanup
+    // below AND by the `.then()` below once `start()` eventually resolves)
+    // guarantees the camera is stopped regardless of which happens first:
+    // unmount, or `start()` resolving. React StrictMode's dev-mode
+    // double-invoke of effects (mount → cleanup → remount) hits this exact
+    // race on essentially every open, as does a fast real-world
+    // open/"Cerrar escáner" tap.
     let stopped = false;
 
     scanner
@@ -58,6 +71,14 @@ export function QRScanner({
           // error worth surfacing.
         },
       )
+      .then(() => {
+        // `start()` resolved AFTER the component already unmounted (and the
+        // synchronous cleanup below found `isScanning` still `false`, so it
+        // couldn't stop anything then) — the stream is live now, so stop it.
+        if (stopped) {
+          scanner.stop().then(() => scanner.clear()).catch(() => undefined);
+        }
+      })
       .catch((err: unknown) => {
         if (!stopped) {
           setCameraError(
