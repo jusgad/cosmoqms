@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
-import { KPICard } from "@/app/(app)/dashboard/KPICard";
+import { KPICard } from "@/components/dashboard/KPICard";
+import { BatchStatusChart } from "@/components/dashboard/BatchStatusChart";
 
 const DAYS_UNTIL_EXPIRY_WARNING = 30;
 
@@ -16,7 +17,7 @@ export default async function DashboardPage() {
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const expiryWindowEnd = new Date(now.getTime() + DAYS_UNTIL_EXPIRY_WARNING * 24 * 60 * 60 * 1000);
 
-  const [lotesEnCurso, desviacionesAbiertas, vencimientosProximos, lotesLiberadosEsteMes] =
+  const [lotesEnCurso, desviacionesAbiertas, vencimientosProximos, lotesLiberadosEsteMes, statusGroups] =
     await withTenant(user.tenantId, user.id, (tx) =>
       Promise.all([
         // Ordenes de produccion que no han llegado a un estado terminal
@@ -50,8 +51,18 @@ export default async function DashboardPage() {
             releasedAt: { gte: monthStart, lt: nextMonthStart },
           },
         }),
+        // Current count of production orders per `BatchStatus`, feeding
+        // `BatchStatusChart` — a presentational component, so the `groupBy`
+        // itself lives here alongside the other KPI queries.
+        tx.productionOrder.groupBy({
+          by: ["status"],
+          where: { tenantId: user.tenantId },
+          _count: { _all: true },
+        }),
       ]),
     );
+
+  const statusCounts = statusGroups.map((g) => ({ status: g.status, count: g._count._all }));
 
   return (
     <div>
@@ -61,6 +72,9 @@ export default async function DashboardPage() {
         <KPICard label="Desviaciones abiertas" value={desviacionesAbiertas} />
         <KPICard label="Vencimientos próximos" value={vencimientosProximos} />
         <KPICard label="Lotes liberados este mes" value={lotesLiberadosEsteMes} />
+      </div>
+      <div className="mt-4">
+        <BatchStatusChart counts={statusCounts} />
       </div>
     </div>
   );
