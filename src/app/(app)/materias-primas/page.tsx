@@ -11,7 +11,7 @@ export default async function MateriasPrimasPage() {
     redirect("/login");
   }
 
-  const lots = await withTenant(user.tenantId, (tx) =>
+  const lots = await withTenant(user.tenantId, user.id, (tx) =>
     tx.rawMaterialLot.findMany({
       orderBy: { receivedAt: "desc" },
       include: { rawMaterial: true },

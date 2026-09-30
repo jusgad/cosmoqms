@@ -11,7 +11,7 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
     redirect("/login");
   }
 
-  const lot = await withTenant(user.tenantId, (tx) =>
+  const lot = await withTenant(user.tenantId, user.id, (tx) =>
     tx.rawMaterialLot.findUnique({ where: { id }, include: { rawMaterial: true } }),
   );
 

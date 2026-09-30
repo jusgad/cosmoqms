@@ -11,7 +11,7 @@ export default async function FormulasPage() {
     redirect("/login");
   }
 
-  const formulas = await withTenant(user.tenantId, (tx) =>
+  const formulas = await withTenant(user.tenantId, user.id, (tx) =>
     tx.masterFormula.findMany({ orderBy: { name: "asc" } }),
   );
 

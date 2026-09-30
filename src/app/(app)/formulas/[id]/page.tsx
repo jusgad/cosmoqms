@@ -11,7 +11,7 @@ export default async function FormulaDetailPage({ params }: { params: Promise<{ 
     redirect("/login");
   }
 
-  const formula = await withTenant(user.tenantId, (tx) =>
+  const formula = await withTenant(user.tenantId, user.id, (tx) =>
     tx.masterFormula.findUnique({
       where: { id },
       include: { ingredients: { include: { rawMaterial: true }, orderBy: { orderIndex: "asc" } } },

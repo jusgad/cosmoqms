@@ -42,7 +42,7 @@ const finishedProductLotFindFirstOrThrow = vi.fn(async () => ({
 const productionOrderFindMany = vi.fn(async () => [{ id: "po1", orderNumber: "OP-2026-001" }]);
 
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
+  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       batchEvent: { findMany: batchEventFindMany },
       rawMaterialLot: { findFirstOrThrow: rawMaterialLotFindFirstOrThrow, findMany: rawMaterialLotFindMany },

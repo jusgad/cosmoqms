@@ -13,7 +13,7 @@ export default async function PesajePage({ params }: { params: Promise<{ id: str
     redirect(`/produccion/${id}`);
   }
 
-  const order = await withTenant(user.tenantId, (tx) =>
+  const order = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findUniqueOrThrow({
       where: { id },
       include: { formula: { include: { ingredients: true } } },

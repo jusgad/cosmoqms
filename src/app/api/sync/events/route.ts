@@ -113,7 +113,7 @@ export async function POST(req: Request) {
   const results: { clientEventId: string; status: SyncStatus }[] = [];
 
   for (const event of parsed.events) {
-    const status = await withTenant(currentUser.tenantId, async (tx): Promise<SyncStatus> => {
+    const status = await withTenant(currentUser.tenantId, currentUser.id, async (tx): Promise<SyncStatus> => {
       let isNew = true;
       try {
         await tx.batchEvent.create({

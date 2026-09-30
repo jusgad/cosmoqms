@@ -16,7 +16,7 @@ export default async function CalidadPage() {
     redirect("/dashboard");
   }
 
-  const orders = await withTenant(user.tenantId, (tx) =>
+  const orders = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findMany({
       where: { tenantId: user.tenantId, status: "calidad" },
       orderBy: { orderNumber: "asc" },

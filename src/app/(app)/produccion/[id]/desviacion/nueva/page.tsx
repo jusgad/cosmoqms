@@ -18,7 +18,7 @@ export default async function NuevaDesviacionPage({ params }: { params: Promise<
     redirect(`/produccion/${id}`);
   }
 
-  const order = await withTenant(user.tenantId, (tx) => tx.productionOrder.findUniqueOrThrow({ where: { id } }));
+  const order = await withTenant(user.tenantId, user.id, (tx) => tx.productionOrder.findUniqueOrThrow({ where: { id } }));
 
   return (
     <div className="flex flex-col gap-4">

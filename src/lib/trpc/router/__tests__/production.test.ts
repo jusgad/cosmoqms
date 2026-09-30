@@ -11,7 +11,7 @@ const findUniqueOrThrow = vi.fn(
 const create = vi.fn();
 
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
+  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({ masterFormula: { findUniqueOrThrow }, productionOrder: { create } }),
 }));
 

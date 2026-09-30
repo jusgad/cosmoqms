@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  const organization = await withTenant(user.tenantId, (tx) =>
+  const organization = await withTenant(user.tenantId, user.id, (tx) =>
     tx.organization.findUnique({ where: { id: user.tenantId }, select: { name: true } }),
   );
 
