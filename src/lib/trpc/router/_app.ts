@@ -4,6 +4,7 @@ import { formulasRouter } from "@/lib/trpc/router/formulas";
 import { productionRouter } from "@/lib/trpc/router/production";
 import { qcRouter } from "@/lib/trpc/router/qc";
 import { deviationsRouter } from "@/lib/trpc/router/deviations";
+import { traceabilityRouter } from "@/lib/trpc/router/traceability";
 
 export const appRouter = router({
   materials: materialsRouter,
@@ -11,6 +12,7 @@ export const appRouter = router({
   production: productionRouter,
   qc: qcRouter,
   deviations: deviationsRouter,
+  traceability: traceabilityRouter,
 });
 
 export type AppRouter = typeof appRouter;
