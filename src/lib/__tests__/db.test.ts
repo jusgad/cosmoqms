@@ -2,25 +2,34 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const executed: { sql: string; values: unknown[] }[] = [];
 
-// Task 17: `withTenant` now wraps `tx` with `withAuditLog(tx, ...)` before
-// handing it to `fn`, i.e. it calls `tx.$extends(...)`. This fake returns
-// itself from `$extends` so the wrapped client stays referentially the fake
-// tx for this test's purposes (this test cares about the tenant-scoping SQL,
-// not the audit extension's own behavior — that's `audit.test.ts`'s job).
+// Task 17 review round 1 (Critical fix): the previous version of this mock
+// fabricated a `$extends` method on `tx` itself — but `Prisma.TransactionClient`
+// explicitly strips `$extends` via `ITXClientDenyList` (verified against the
+// compiled runtime's deny-list Proxy: a real `tx.$extends` is `undefined`),
+// so that mock shape was itself inaccurate and hid the real bug (`withTenant`
+// calling `tx.$extends(...)`, which throws at runtime). The fix in `db.ts`
+// now extends the top-level `prisma` client BEFORE opening the transaction —
+// i.e. it calls `prisma.$extends(...)`, and the object that returns is what
+// `.$transaction(...)` is called on. This mock reflects that real shape:
+// `FakePrismaClient.$extends` returns an object exposing `$transaction`,
+// and `tx` itself (what `fn` receives inside the transaction callback) has
+// no `$extends` at all, matching Prisma's actual `TransactionClient` type.
 const fakeTx = {
   $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) => {
     executed.push({ sql: strings.join("?"), values });
     return Promise.resolve(1);
   },
-  $extends: vi.fn(() => fakeTx),
 };
 
 const transactionMock = vi.fn((fn: (tx: unknown) => Promise<unknown>) =>
   fn(fakeTx),
 );
 
+const extendedClient = { $transaction: transactionMock };
+const extendsMock = vi.fn(() => extendedClient);
+
 class FakePrismaClient {
-  $transaction = transactionMock;
+  $extends = extendsMock;
 }
 
 vi.mock("@prisma/client", () => ({
@@ -32,7 +41,7 @@ describe("withTenant", () => {
   beforeEach(() => {
     executed.length = 0;
     transactionMock.mockClear();
-    fakeTx.$extends.mockClear();
+    extendsMock.mockClear();
   });
 
   it("sets app.current_tenant_id before running the callback", async () => {
@@ -44,8 +53,12 @@ describe("withTenant", () => {
     });
 
     expect(result).toBe("ok");
+    // The extension is applied to `prisma` first, and `$transaction` is
+    // called on the *extended* client, not the raw one — asserting the call
+    // order this way is what would have caught the original bug (calling
+    // `$extends` on `tx` inside the transaction instead).
+    expect(extendsMock).toHaveBeenCalledTimes(1);
     expect(transactionMock).toHaveBeenCalledTimes(1);
-    expect(fakeTx.$extends).toHaveBeenCalledTimes(1);
     expect(executed).toHaveLength(1);
     expect(executed[0].sql).toContain("set_config");
     expect(executed[0].values).toContain("tenant-123");
