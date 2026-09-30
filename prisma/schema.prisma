@@ -250,14 +250,14 @@ enum DeviationStatus {
 }
 
 model Deviation {
-  id                String          @id @default(uuid())
-  tenantId          String          @map("tenant_id")
-  productionOrderId String          @map("production_order_id")
-  description       String
-  investigation     String?
-  correctiveAction  String?         @map("corrective_action")
-  status            DeviationStatus @default(abierta)
-  raisedBy          String          @map("raised_by")
+  id                     String          @id @default(uuid())
+  tenantId               String          @map("tenant_id")
+  productionOrderId      String          @map("production_order_id")
+  description            String
+  investigation          String?
+  correctiveAction       String?         @map("corrective_action")
+  status                 DeviationStatus @default(abierta)
+  raisedBy               String          @map("raised_by")
   // Task 13 review round 1 (user decision: split `investigate` into two
   // steps for audit-trail granularity): records who started the
   // investigation and when the `abierta -> en_investigacion` transition
@@ -271,12 +271,12 @@ model Deviation {
   // unblocks; `prisma generate` (client codegen only, no DB connection
   // needed) is run instead so the typed Prisma Client used by
   // `deviations.ts`/tests reflects these fields now.
-  investigationStartedBy String?   @map("investigation_started_by")
-  investigationStartedAt DateTime? @map("investigation_started_at")
-  approvedBy        String?         @map("approved_by")
-  approvedAt        DateTime?       @map("approved_at")
-  tenant            Organization    @relation(fields: [tenantId], references: [id])
-  order             ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  investigationStartedBy String?         @map("investigation_started_by")
+  investigationStartedAt DateTime?       @map("investigation_started_at")
+  approvedBy             String?         @map("approved_by")
+  approvedAt             DateTime?       @map("approved_at")
+  tenant                 Organization    @relation(fields: [tenantId], references: [id])
+  order                  ProductionOrder @relation(fields: [productionOrderId], references: [id])
 
   @@index([tenantId])
   @@map("deviations")

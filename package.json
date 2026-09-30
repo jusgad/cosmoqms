@@ -55,8 +55,12 @@
     "prettier": "^3.9.9",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^5.0.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
