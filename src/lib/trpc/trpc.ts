@@ -21,7 +21,7 @@ export function roleProcedure(...roles: Role[]) {
   });
 }
 
-export function tenantTx<T>(ctx: TRPCContext, fn: Parameters<typeof withTenant<T>>[1]) {
+export function tenantTx<T>(ctx: TRPCContext, fn: Parameters<typeof withTenant<T>>[2]) {
   if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-  return withTenant(ctx.user.tenantId, fn);
+  return withTenant(ctx.user.tenantId, ctx.user.id, fn);
 }

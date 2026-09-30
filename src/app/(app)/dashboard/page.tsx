@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   const expiryWindowEnd = new Date(now.getTime() + DAYS_UNTIL_EXPIRY_WARNING * 24 * 60 * 60 * 1000);
 
   const [lotesEnCurso, desviacionesAbiertas, vencimientosProximos, lotesLiberadosEsteMes] =
-    await withTenant(user.tenantId, (tx) =>
+    await withTenant(user.tenantId, user.id, (tx) =>
       Promise.all([
         // Ordenes de produccion que no han llegado a un estado terminal
         // (liberado/rechazado) cuentan como "en curso".

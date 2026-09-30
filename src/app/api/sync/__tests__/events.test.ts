@@ -31,7 +31,7 @@ const findUniqueOrThrow = vi.fn(async (): Promise<MockOrder> => ({ id: "po1", st
 const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
 
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
+  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({ batchEvent: { create }, productionOrder: { findUniqueOrThrow, updateMany } }),
 }));
 

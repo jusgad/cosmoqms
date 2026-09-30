@@ -20,7 +20,7 @@ export default async function DesviacionesPage() {
     redirect("/login");
   }
 
-  const deviations = await withTenant(user.tenantId, (tx) =>
+  const deviations = await withTenant(user.tenantId, user.id, (tx) =>
     tx.deviation.findMany({
       where: { tenantId: user.tenantId, status: { not: "cerrada" } },
       orderBy: { id: "asc" },

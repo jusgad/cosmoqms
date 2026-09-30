@@ -12,7 +12,7 @@ export default async function NuevaMateriaPrimaPage() {
     redirect("/materias-primas");
   }
 
-  const materials = await withTenant(user.tenantId, (tx) =>
+  const materials = await withTenant(user.tenantId, user.id, (tx) =>
     tx.rawMaterial.findMany({ orderBy: { name: "asc" }, select: { id: true, code: true, name: true } }),
   );
 

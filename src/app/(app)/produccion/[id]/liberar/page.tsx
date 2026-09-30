@@ -14,7 +14,7 @@ export default async function LiberarPage({ params }: { params: Promise<{ id: st
     redirect("/login");
   }
 
-  const order = await withTenant(user.tenantId, (tx) =>
+  const order = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findUniqueOrThrow({ where: { id } }),
   );
 

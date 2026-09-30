@@ -16,7 +16,7 @@ export default async function FirmaPage({ params }: { params: Promise<{ id: stri
     redirect("/login");
   }
 
-  const order = await withTenant(user.tenantId, (tx) =>
+  const order = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findUniqueOrThrow({ where: { id } }),
   );
 

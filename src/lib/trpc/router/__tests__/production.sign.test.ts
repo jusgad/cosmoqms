@@ -21,7 +21,7 @@ const findUniqueOrThrow = vi.fn(async () => ({ id: "po1", status: "pesado" as co
 const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
 
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
+  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       batchSignature: { create: batchSignatureCreate },
       batchEvent: { create: batchEventCreate },

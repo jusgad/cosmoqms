@@ -27,7 +27,7 @@ const deviationFindUniqueOrThrow = vi.fn(async () => ({
 const deviationFindMany = vi.fn(async () => []);
 
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, fn: (tx: unknown) => unknown) =>
+  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       deviation: {
         create: deviationCreate,

@@ -32,7 +32,7 @@ export default async function ProduccionPage() {
     redirect("/login");
   }
 
-  const orders = await withTenant(user.tenantId, (tx) =>
+  const orders = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findMany({ orderBy: { orderNumber: "asc" }, include: { formula: true } }),
   );
 

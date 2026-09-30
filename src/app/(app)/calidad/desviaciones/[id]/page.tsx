@@ -15,7 +15,7 @@ export default async function DesviacionDetailPage({ params }: { params: Promise
     redirect("/login");
   }
 
-  const deviation = await withTenant(user.tenantId, (tx) =>
+  const deviation = await withTenant(user.tenantId, user.id, (tx) =>
     tx.deviation.findUniqueOrThrow({ where: { id }, include: { order: true } }),
   );
 

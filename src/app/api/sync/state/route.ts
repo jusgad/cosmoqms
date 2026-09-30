@@ -8,7 +8,7 @@ import { withTenant } from "@/lib/db";
 // back to this cached response when offline). `?since=` is accepted for a
 // future incremental-refresh optimization but both queries are cheap enough
 // to always return the full current set for now — never trusting anything
-// from the client to scope the tenant, only `withTenant(user.tenantId, ...)`.
+// from the client to scope the tenant, only `withTenant(user.tenantId, user.id, ...)`.
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ success: false }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   // malformed value fails loudly instead of being silently ignored forever.
   searchParams.get("since");
 
-  const [activeFormulas, availableLots] = await withTenant(user.tenantId, (tx) =>
+  const [activeFormulas, availableLots] = await withTenant(user.tenantId, user.id, (tx) =>
     Promise.all([
       tx.masterFormula.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
       tx.rawMaterialLot.findMany({
