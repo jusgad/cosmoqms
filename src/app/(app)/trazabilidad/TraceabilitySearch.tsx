@@ -113,13 +113,22 @@ export function TraceabilitySearch() {
               Sin resultados de trazabilidad para este código.
             </p>
           ) : (
+            // Review round 1 (Important finding): the primary label is the
+            // human-readable identifier (`orderNumber`/`supplierLotCode`,
+            // matching how the rest of the app displays these entities —
+            // e.g. calidad/page.tsx's table shows `orderNumber`, never a raw
+            // id). The UUID is kept only as a small secondary detail line,
+            // never the only thing shown.
             <ul className="flex flex-col gap-1 pl-4">
               {activeQuery.data.map((entry) => (
                 <li
-                  key={entry}
-                  className="min-h-[44px] rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground"
+                  key={entry.id}
+                  className="flex min-h-[44px] flex-col justify-center rounded-lg border border-border bg-card px-3 py-2"
                 >
-                  {entry}
+                  <span className="font-mono text-sm text-foreground">
+                    {"orderNumber" in entry ? entry.orderNumber : entry.supplierLotCode}
+                  </span>
+                  <span className="font-mono text-xs text-muted-foreground">{entry.id}</span>
                 </li>
               ))}
             </ul>

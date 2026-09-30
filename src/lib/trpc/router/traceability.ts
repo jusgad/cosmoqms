@@ -37,6 +37,15 @@ function weighingLotId(payload: Prisma.JsonValue): string | undefined {
 // `tenantTx` as the genealogy query: each procedure accepts a `*Code`
 // string and resolves it to the lot's id via `findFirstOrThrow` before
 // running the same query logic the brief specified.
+//
+// Review round 1 (Important finding): the brief's literal return shape was a
+// bare list of ids (`productionOrderId[]` / `rawMaterialLotId[]`), which
+// resolved the search-*input* half of "human code, not UUID" but left the
+// *output* rendering a wall of UUIDs — inconsistent with the rest of the app
+// (e.g. `calidad/page.tsx`'s table shows `orderNumber`, never
+// `ProductionOrder.id`). Both procedures now return `{ id, <human field> }[]`
+// instead of a bare `string[]`, fetched via one small additional
+// tenant-scoped query over the distinct ids already collected.
 export const traceabilityRouter = router({
   byRawMaterialLot: roleProcedure("calidad", "director_tecnico")
     .input(z.object({ rawMaterialLotCode: z.string().min(1) }))
@@ -62,7 +71,17 @@ export const traceabilityRouter = router({
           where: { tenantId: ctx.user.tenantId, eventType: "weighing" },
         });
         const matches = events.filter((e) => weighingLotId(e.payload) === lot.id);
-        return [...new Set(matches.map((e) => e.productionOrderId))];
+        const productionOrderIds = [...new Set(matches.map((e) => e.productionOrderId))];
+        if (productionOrderIds.length === 0) return [];
+
+        // Human-readable label: `ProductionOrder.orderNumber` (e.g.
+        // "OP-2026-001"), already used everywhere else in the app
+        // (calidad/page.tsx's table, etc.) instead of the raw id.
+        const orders = await tx.productionOrder.findMany({
+          where: { tenantId: ctx.user.tenantId, id: { in: productionOrderIds } },
+          select: { id: true, orderNumber: true },
+        });
+        return orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber }));
       }),
     ),
   byFinishedLot: roleProcedure("calidad", "director_tecnico")
@@ -79,9 +98,20 @@ export const traceabilityRouter = router({
             eventType: "weighing",
           },
         });
-        return events
-          .map((e) => weighingLotId(e.payload))
-          .filter((id): id is string => Boolean(id));
+        const rawMaterialLotIds = [
+          ...new Set(events.map((e) => weighingLotId(e.payload)).filter((id): id is string => Boolean(id))),
+        ];
+        if (rawMaterialLotIds.length === 0) return [];
+
+        // Human-readable label: the raw material lot's `supplierLotCode`
+        // (same field calidad reads off the COA/physical label elsewhere in
+        // the app — LotManualSearch.tsx, WeighingForm.tsx) instead of the
+        // raw id.
+        const lots = await tx.rawMaterialLot.findMany({
+          where: { tenantId: ctx.user.tenantId, id: { in: rawMaterialLotIds } },
+          select: { id: true, supplierLotCode: true },
+        });
+        return lots.map((l) => ({ id: l.id, supplierLotCode: l.supplierLotCode }));
       }),
     ),
 });
