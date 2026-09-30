@@ -7,10 +7,17 @@ import { renderBatchRecordHtml, renderPdf, type BatchRecordOrder } from "@/lib/p
 // `prisma` call) per the codebase's established pattern — RLS is enforced by
 // the `set_config('app.current_tenant_id', ...)` that `withTenant` issues
 // inside its transaction, and that must run before ANY query against a
-// regulated table, reads included. `where: { id }` alone (no `tenantId` in
-// the filter) matches every other detail-page/route in the app (e.g.
-// `produccion/[id]/page.tsx`) — RLS, not an app-level filter, is what keeps
-// this tenant-scoped.
+// regulated table, reads included.
+//
+// Review round 1 fix (task 18): the `where` clause also filters explicitly
+// by `tenantId` as defense-in-depth, matching `traceability.ts`'s explicit
+// rationale (every regulated query filters by `tenantId` even though
+// `withTenant`'s `SET LOCAL` already scopes it, because RLS policies don't
+// exist yet in a live DB — Task 3 remains blocked — so the app-level filter
+// is the only enforcement that actually runs today) and `deviations.ts`'s
+// `updateMany` guards. This matters more here than most routes: a PDF export
+// endpoint returning raw bytes of a regulated legal document, trivially
+// probed by id, is exactly the case defense-in-depth exists for.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try {
@@ -25,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const order = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findUniqueOrThrow({
-      where: { id },
+      where: { id, tenantId: user.tenantId },
       include: { signatures: true, qcResults: true, events: true },
     }),
   );
