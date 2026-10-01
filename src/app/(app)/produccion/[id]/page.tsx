@@ -7,6 +7,7 @@ import { StageTracker } from "@/components/batch/StageTracker";
 import { EventTimeline } from "@/components/batch/EventTimeline";
 import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
 import { isSignableStage, STAGE_SIGNER_ROLES } from "@/lib/validation/production";
+import { WEIGHABLE_STATUSES, getMissingIngredients } from "@/lib/production/weighing";
 
 export default async function BatchRecordPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +31,17 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
     notFound();
   }
 
+  // Final review wrap-up: `WEIGHABLE_STATUSES` (planificado | pesado) is the
+  // same set `applyWeighing` accepts server-side — the link must stay
+  // reachable for the whole window, not just `planificado`, otherwise a
+  // multi-ingredient formula gets stuck after its first weighing (which
+  // advances the order to `pesado`). While `pesado`, also surface how many
+  // ingredients are still unweighed so it's clear the link is still needed.
+  const missingIngredientsCount =
+    order.status === "pesado"
+      ? (await withTenant(user.tenantId, user.id, (tx) => getMissingIngredients(tx, user.tenantId, order))).length
+      : 0;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -44,8 +56,17 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
 
       <StageTracker status={order.status} />
 
-      {order.status === "planificado" && (
-        <Button render={<Link href={`/produccion/${order.id}/pesaje`}>Registrar pesaje</Link>} />
+      {WEIGHABLE_STATUSES.includes(order.status) && (
+        <Button
+          render={
+            <Link href={`/produccion/${order.id}/pesaje`}>
+              Registrar pesaje
+              {order.status === "pesado" && missingIngredientsCount > 0
+                ? ` (faltan ${missingIngredientsCount})`
+                : ""}
+            </Link>
+          }
+        />
       )}
       {/* Final review (Important 6): only shown to a role allowed to sign the
           CURRENT stage — `production.sign` enforces the same rule server-side. */}

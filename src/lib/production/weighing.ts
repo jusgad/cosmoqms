@@ -36,7 +36,7 @@ export type WeighingInput = {
 // for), never something to append silently. That also covers the terminal
 // `liberado`/`rechazado` states (Important 7a: weighings were previously
 // appended to already-released, closed batch records).
-const WEIGHABLE_STATUSES: readonly BatchStatus[] = ["planificado", "pesado"];
+export const WEIGHABLE_STATUSES: readonly BatchStatus[] = ["planificado", "pesado"];
 
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -144,11 +144,14 @@ export function weighingLotId(payload: Prisma.JsonValue): string | undefined {
 // per RAW MATERIAL (via each weighed lot's `rawMaterialId`), not by counting
 // distinct lots — two lots of the same ingredient (a split weighing) must not
 // stand in for a different, never-weighed ingredient.
-export async function assertAllIngredientsWeighed(
+// Shared by `assertAllIngredientsWeighed` (throws, used before signing) and
+// the `produccion/[id]` page (read-only, used to decide whether "Registrar
+// pesaje" should still be shown and how many ingredients remain).
+export async function getMissingIngredients(
   tx: Prisma.TransactionClient,
   tenantId: string,
   order: { id: string; formulaId: string },
-): Promise<void> {
+) {
   const ingredients = await tx.formulaIngredient.findMany({
     where: { formulaId: order.formulaId, formula: { tenantId } },
     select: { rawMaterialId: true },
@@ -165,7 +168,19 @@ export async function assertAllIngredientsWeighed(
       ? []
       : await tx.rawMaterialLot.findMany({ where: { id: { in: lotIds }, tenantId }, select: { rawMaterialId: true } });
   const weighedMaterials = new Set(lots.map((lot) => lot.rawMaterialId));
-  const missing = ingredients.filter((ingredient) => !weighedMaterials.has(ingredient.rawMaterialId));
+  return ingredients.filter((ingredient) => !weighedMaterials.has(ingredient.rawMaterialId));
+}
+
+export async function assertAllIngredientsWeighed(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  order: { id: string; formulaId: string },
+): Promise<void> {
+  const ingredients = await tx.formulaIngredient.findMany({
+    where: { formulaId: order.formulaId, formula: { tenantId } },
+    select: { rawMaterialId: true },
+  });
+  const missing = await getMissingIngredients(tx, tenantId, order);
 
   if (ingredients.length === 0 || missing.length > 0) {
     reject(
