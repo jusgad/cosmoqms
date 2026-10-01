@@ -34,9 +34,38 @@ export type RecordWeighingValues = z.infer<typeof recordWeighingInput>;
 // electrónica se persiste sin reauth_verified = true y meaning_statement
 // explícito") at the Zod level, not just by convention: no falsy-adjacent
 // value can satisfy it.
+//
+// Final-review fix (Important 6): `stage` used to be an unrestricted
+// `z.string().min(1)`, so a caller could sign `"planificado"` and advance the
+// order to `pesado` with no weighing ever recorded. It is now restricted to
+// the non-terminal, post-planning `BatchStatus` values that represent a
+// completed production stage awaiting attestation.
+export const SIGNABLE_STAGES = ["pesado", "mezclado", "envasado", "calidad"] as const;
+export type SignableStage = (typeof SIGNABLE_STAGES)[number];
+
+export function isSignableStage(value: string): value is SignableStage {
+  return (SIGNABLE_STAGES as readonly string[]).includes(value);
+}
+
+// Who may attest each stage (Blueprint's role table, "Roles y permisos"):
+// `operario` "captura pesaje/mezclado/envasado de su etapa, firma su etapa",
+// with `jefe_planta` (plant supervisor) also allowed for the production
+// floor stages. The `calidad` stage is a quality attestation — Blueprint
+// gives `calidad` "registrar resultados QC ... aprobar/rechazar puntos
+// críticos" and `director_tecnico` "todo lo de calidad", so those two sign it;
+// a production operator must never attest QC. Plain string literals (not the
+// Prisma `Role` enum value) keep this module client-bundle safe; the router
+// enforces it server-side, `SignaturePad`/the batch page only mirror it.
+export const STAGE_SIGNER_ROLES: Record<SignableStage, readonly string[]> = {
+  pesado: ["operario", "jefe_planta"],
+  mezclado: ["operario", "jefe_planta"],
+  envasado: ["operario", "jefe_planta"],
+  calidad: ["calidad", "director_tecnico"],
+};
+
 export const signInput = z.object({
   productionOrderId: z.string().uuid(),
-  stage: z.string().min(1),
+  stage: z.enum(SIGNABLE_STAGES),
   meaningStatement: z.string().min(10, "La declaración de significado es obligatoria"),
   reauthVerified: z.literal(true, { error: "Se requiere reautenticación" }),
 });

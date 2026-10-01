@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { DeviationForm } from "@/components/quality/DeviationForm";
@@ -16,8 +16,11 @@ export default async function DesviacionDetailPage({ params }: { params: Promise
   }
 
   const deviation = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.deviation.findUniqueOrThrow({ where: { id }, include: { order: true } }),
+    tx.deviation.findFirst({ where: { id, tenantId: user.tenantId }, include: { order: true } }),
   );
+  if (!deviation) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-col gap-4">

@@ -19,7 +19,7 @@ import { useReverification } from "@clerk/nextjs";
 import { isReverificationCancelledError } from "@clerk/nextjs/errors";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
-import { SIGNATURE_MEANING_STATEMENTS } from "@/lib/validation/production";
+import { SIGNATURE_MEANING_STATEMENTS, type SignableStage } from "@/lib/validation/production";
 import { verifyReauthForSignature } from "@/app/(app)/produccion/[id]/firma/actions";
 
 export function SignaturePad({
@@ -27,7 +27,7 @@ export function SignaturePad({
   stage,
 }: {
   productionOrderId: string;
-  stage: string;
+  stage: SignableStage;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);

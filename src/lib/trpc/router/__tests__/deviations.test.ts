@@ -12,7 +12,7 @@ const deviationUpdateMany = vi.fn(async (args: DeviationUpdateManyArgs): Promise
   void args; // typed for the `toHaveBeenCalledWith` assertions below, not read here
   return { count: updateManyCount };
 });
-const deviationFindUniqueOrThrow = vi.fn(async () => ({
+const deviationFindFirstOrThrow = vi.fn(async () => ({
   id: "dev1",
   tenantId: "t1",
   productionOrderId: "po1",
@@ -25,6 +25,10 @@ const deviationFindUniqueOrThrow = vi.fn(async () => ({
   approvedAt: new Date(),
 }));
 const deviationFindMany = vi.fn(async () => []);
+let deviationById: { id: string } | null = { id: "dev1" };
+const deviationFindFirst = vi.fn(async () => deviationById);
+let orderForCreate: { id: string } | null = { id: "po1" };
+const productionOrderFindFirst = vi.fn(async () => orderForCreate);
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
@@ -32,9 +36,11 @@ vi.mock("@/lib/db", () => ({
       deviation: {
         create: deviationCreate,
         updateMany: deviationUpdateMany,
-        findUniqueOrThrow: deviationFindUniqueOrThrow,
+        findFirstOrThrow: deviationFindFirstOrThrow,
+        findFirst: deviationFindFirst,
         findMany: deviationFindMany,
       },
+      productionOrder: { findFirst: productionOrderFindFirst },
     }),
 }));
 
@@ -78,6 +84,20 @@ describe("deviations.create", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updateManyCount = 1;
+    orderForCreate = { id: "po1" };
+  });
+
+  // Final review (Critical 2): a deviation must never attach to another
+  // tenant's batch (where it would also block that tenant's release).
+  it("rejects a productionOrderId that doesn't belong to the caller's tenant", async () => {
+    orderForCreate = null;
+    await expect(
+      caller("operario").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(productionOrderFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "550e8400-e29b-41d4-a716-446655440000", tenantId: "t1" } }),
+    );
+    expect(deviationCreate).not.toHaveBeenCalled();
   });
 
   it("rejects create from a role not in calidad/jefe_planta/operario", async () => {
@@ -170,5 +190,44 @@ describe("deviations.submitInvestigation", () => {
         correctiveAction: "0123456789",
       }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+});
+
+// Final review (Critical 2): by-id reads are tenant-scoped.
+describe("deviations.getById", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deviationById = { id: "dev1" };
+  });
+
+  it("filters by id AND the caller's tenant", async () => {
+    await caller("calidad").getById({ id: "550e8400-e29b-41d4-a716-446655440000" });
+    expect(deviationFindFirst).toHaveBeenCalledWith({
+      where: { id: "550e8400-e29b-41d4-a716-446655440000", tenantId: "t1" },
+    });
+  });
+
+  it("returns NOT_FOUND for a deviation outside the caller's tenant", async () => {
+    deviationById = null;
+    await expect(caller("calidad").getById({ id: "550e8400-e29b-41d4-a716-446655440000" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});
+
+describe("deviations transitions re-read tenant-scoped", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    updateManyCount = 1;
+  });
+
+  it("approve re-reads the deviation with the caller's tenant", async () => {
+    await caller("director_tecnico").approve({ id: "550e8400-e29b-41d4-a716-446655440000" });
+    expect(deviationUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ tenantId: "t1" }) }),
+    );
+    expect(deviationFindFirstOrThrow).toHaveBeenCalledWith({
+      where: { id: "550e8400-e29b-41d4-a716-446655440000", tenantId: "t1" },
+    });
   });
 });

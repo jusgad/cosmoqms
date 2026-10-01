@@ -13,7 +13,7 @@ export default async function NuevaFormulaPage() {
   }
 
   const materials = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.rawMaterial.findMany({ orderBy: { name: "asc" }, select: { id: true, code: true, name: true } }),
+    tx.rawMaterial.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" }, select: { id: true, code: true, name: true } }),
   );
 
   return (

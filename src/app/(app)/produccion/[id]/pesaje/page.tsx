@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { WeighingForm } from "@/components/batch/WeighingForm";
@@ -14,11 +14,14 @@ export default async function PesajePage({ params }: { params: Promise<{ id: str
   }
 
   const order = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findUniqueOrThrow({
-      where: { id },
+    tx.productionOrder.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: { formula: { include: { ingredients: true } } },
     }),
   );
+  if (!order) {
+    notFound();
+  }
 
   // `theoreticalQty` is computed client-side by WeighingForm from these
   // props (see that file's header comment). Prisma `Decimal` values can't

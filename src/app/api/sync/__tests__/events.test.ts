@@ -1,38 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 
-// Architecture-gap resolution (see task-14-report.md for full reasoning):
-// the brief's literal Step 9 route only does `batchEvent.createMany({
-// skipDuplicates: true })` and never calls `advanceStageInternal`. Taken
-// literally, an offline-captured `weighing` event synced through this route
-// would create a `BatchEvent` row but leave the order stuck in
-// `planificado` forever, breaking Task 10's core guarantee. Resolved as
-// Option A (the blueprint's own language: this endpoint "corre bajo la
-// misma máquina de estados que las mutaciones tRPC") — this route mirrors
-// `production.recordWeighing`'s side effect for each genuinely-new
-// `weighing` event.
-//
-// Review round 1 fixes (Critical Findings 1 & 2, Important Finding 1) layer
-// on top of that resolution:
-//   - Each event now commits in its OWN `withTenant` transaction (Critical
-//     1) — a redundant stage-advance (the normal case for a
-//     multi-ingredient formula's several `weighing` events against the same
-//     order) is caught and turned into a silent no-op rather than an error
-//     that would otherwise roll back every event in a shared transaction.
-//   - The route is now role-gated via `requireRole` (Critical 2), matching
-//     `production.recordWeighing`'s own gate.
-//   - `eventType` is a `z.literal("weighing")` and `payload` is validated
-//     against the same shape `recordWeighingInput` requires (Important 1),
-//     not an unrestricted `z.string()`/`z.unknown()`.
-type MockOrder = { id: string; status: "planificado" | "pesado" | "mezclado" };
+// Architecture (Task 14, Option A): this route runs offline-captured
+// `weighing` events through the same server-side logic as
+// `production.recordWeighing` — since the final review both call
+// `applyWeighing` (validation, server-side theoreticalQty, stock decrement,
+// stage advance; covered in lib/production/__tests__/weighing.test.ts). These
+// tests cover the route's own responsibilities: auth, body validation (4xx,
+// never a retry-forever 5xx), per-event transactions, duplicate handling
+// without side effects, and per-event business-rule rejections.
 
-const create = vi.fn();
-const findUniqueOrThrow = vi.fn(async (): Promise<MockOrder> => ({ id: "po1", status: "planificado" }));
-const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
+const { applyWeighing } = vi.hoisted(() => ({ applyWeighing: vi.fn(async () => ({ id: "ev1" })) }));
+vi.mock("@/lib/production/weighing", () => ({ applyWeighing }));
 
+const findFirst = vi.fn(async (): Promise<{ id: string } | null> => null);
+const withTenant = vi.fn((_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
+  fn({ batchEvent: { findFirst } }),
+);
 vi.mock("@/lib/db", () => ({
-  withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
-    fn({ batchEvent: { create }, productionOrder: { findUniqueOrThrow, updateMany } }),
+  withTenant: (tenantId: string, actorUserId: string, fn: (tx: unknown) => unknown) =>
+    withTenant(tenantId, actorUserId, fn),
 }));
 
 const { requireRole, MockUnauthorizedError, MockForbiddenError } = vi.hoisted(() => {
@@ -52,17 +40,18 @@ vi.mock("@/lib/auth", () => ({
 
 import { POST } from "../events/route";
 
+const EVENT_1 = "11111111-1111-4111-8111-111111111111";
+const EVENT_2 = "22222222-2222-4222-8222-222222222222";
+const ORDER_ID = "550e8400-e29b-41d4-a716-446655440000";
+
 function makeRequest(events: Record<string, unknown>[]) {
-  return new Request("http://localhost/api/sync/events", {
-    method: "POST",
-    body: JSON.stringify({ events }),
-  });
+  return new Request("http://localhost/api/sync/events", { method: "POST", body: JSON.stringify({ events }) });
 }
 
 function weighingEvent(overrides: Record<string, unknown> = {}) {
   return {
-    clientEventId: "11111111-1111-4111-8111-111111111111",
-    productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
+    clientEventId: EVENT_1,
+    productionOrderId: ORDER_ID,
     eventType: "weighing",
     payload: { rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440001", theoreticalQty: 10, actualQty: 9.9 },
     occurredAt: new Date().toISOString(),
@@ -71,128 +60,135 @@ function weighingEvent(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function uniqueViolation() {
+  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed on the fields: (`client_event_id`)", {
+    code: "P2002",
+    clientVersion: "test",
+  });
+}
+
 beforeEach(() => {
-  create.mockReset();
-  findUniqueOrThrow.mockClear();
-  updateMany.mockClear();
-  requireRole.mockClear();
+  vi.clearAllMocks();
+  findFirst.mockResolvedValue(null);
+  applyWeighing.mockResolvedValue({ id: "ev1" });
   requireRole.mockResolvedValue({ id: "u1", tenantId: "t1", role: "operario" as const });
 });
 
 describe("POST /api/sync/events", () => {
-  it("creates the batch_events row without update/delete and reports success", async () => {
-    create.mockResolvedValueOnce({ id: "ev1" });
+  it("applies a new weighing with the caller's tenant/actor and reports it accepted", async () => {
     const res = await POST(makeRequest([weighingEvent()]));
     const body = await res.json();
 
-    expect(create).toHaveBeenCalledWith(
+    expect(withTenant).toHaveBeenCalledWith("t1", "u1", expect.any(Function));
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: "t1", clientEventId: EVENT_1 } }),
+    );
+    expect(applyWeighing).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
-        data: expect.objectContaining({ eventType: "weighing", clientEventId: "11111111-1111-4111-8111-111111111111" }),
+        tenantId: "t1",
+        actorUserId: "u1",
+        productionOrderId: ORDER_ID,
+        rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440001",
+        actualQty: 9.9,
+        clientEventId: EVENT_1,
+        deviceId: "d1",
       }),
     );
+    expect(body).toEqual({ success: true, results: [{ clientEventId: EVENT_1, status: "accepted" }] });
+  });
+
+  // CLAUDE.md rule 6: a retried clientEventId is never applied twice — no
+  // second stock decrement, no second stage advance.
+  it("reports an already-synced clientEventId as duplicate without applying it again", async () => {
+    findFirst.mockResolvedValueOnce({ id: "existing" });
+    const res = await POST(makeRequest([weighingEvent()]));
+    const body = await res.json();
+
+    expect(applyWeighing).not.toHaveBeenCalled();
+    expect(body.results).toEqual([{ clientEventId: EVENT_1, status: "duplicate" }]);
+  });
+
+  it("reports a concurrent duplicate (P2002 from the insert race) as duplicate", async () => {
+    applyWeighing.mockRejectedValueOnce(uniqueViolation());
+    const res = await POST(makeRequest([weighingEvent()]));
+    const body = await res.json();
+
+    expect(body.results).toEqual([{ clientEventId: EVENT_1, status: "duplicate" }]);
     expect(body.success).toBe(true);
   });
 
-  it("advances a genuinely-new weighing event to 'pesado', exactly like production.recordWeighing", async () => {
-    create.mockResolvedValueOnce({ id: "ev1" });
-    const res = await POST(makeRequest([weighingEvent()]));
+  // Important 7a: a weighing for a closed/released batch (or any other
+  // business-rule failure) is a per-event rejection with the reason — never
+  // silently accepted, never a whole-batch failure.
+  it("reports a business-rule rejection for that event only, with its reason", async () => {
+    applyWeighing
+      .mockRejectedValueOnce(new TRPCError({ code: "BAD_REQUEST", message: "La orden está en 'liberado' — ya no admite pesajes" }))
+      .mockResolvedValueOnce({ id: "ev2" });
+
+    const res = await POST(makeRequest([weighingEvent(), weighingEvent({ clientEventId: EVENT_2 })]));
     const body = await res.json();
 
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "550e8400-e29b-41d4-a716-446655440000", status: "planificado" },
-        data: { status: "pesado" },
-      }),
-    );
-    expect(body.results).toEqual([{ clientEventId: "11111111-1111-4111-8111-111111111111", status: "accepted" }]);
-  });
-
-  it("never re-advances the stage for a duplicate clientEventId retry", async () => {
-    create.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("Unique constraint failed on the fields: (`client_event_id`)", {
-        code: "P2002",
-        clientVersion: "test",
-      }),
-    );
-    const res = await POST(makeRequest([weighingEvent()]));
-    const body = await res.json();
-
-    expect(updateMany).not.toHaveBeenCalled();
-    expect(body.results).toEqual([{ clientEventId: "11111111-1111-4111-8111-111111111111", status: "duplicate" }]);
-    expect(body.success).toBe(true);
-  });
-
-  it("re-throws a non-duplicate database error instead of silently swallowing it", async () => {
-    create.mockRejectedValueOnce(new Error("connection reset"));
-    await expect(POST(makeRequest([weighingEvent()]))).rejects.toThrow("connection reset");
-    expect(updateMany).not.toHaveBeenCalled();
-  });
-
-  // Critical Finding 1 regression test: a multi-ingredient formula's
-  // `WeighingForm` queues one `weighing` event per ingredient, all against
-  // the SAME production order — the normal case, not an edge case. The
-  // second event's stage-advance attempt must be a silent no-op (the order
-  // is already at `pesado`), never an error that rolls back the first
-  // event's already-successful write, and never something that blocks the
-  // second event's own `BatchEvent` row from persisting either.
-  it("persists both weighing events for the same order in one sync call, advancing the stage exactly once", async () => {
-    create.mockResolvedValueOnce({ id: "ev1" }).mockResolvedValueOnce({ id: "ev2" });
-    // First event's advance: order is `planificado` -> `pesado` succeeds.
-    // `advanceStageInternal` reads the order twice on a successful advance
-    // (once to check `canTransition`, once more at the end to return the
-    // now-updated row), hence three queued reads total, not two. Second
-    // event's advance: order is now `pesado` -> `canTransition` returns
-    // false -> `advanceStageInternal` throws BAD_REQUEST before ever
-    // touching `updateMany` again, which the route must catch as a no-op.
-    findUniqueOrThrow
-      .mockResolvedValueOnce({ id: "po1", status: "planificado" as const })
-      .mockResolvedValueOnce({ id: "po1", status: "pesado" as const })
-      .mockResolvedValueOnce({ id: "po1", status: "pesado" as const });
-
-    const secondEvent = weighingEvent({
-      clientEventId: "22222222-2222-4222-8222-222222222222",
-      payload: { rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440002", theoreticalQty: 5, actualQty: 5.1 },
-    });
-
-    const res = await POST(makeRequest([weighingEvent(), secondEvent]));
-    const body = await res.json();
-
-    expect(create).toHaveBeenCalledTimes(2);
+    expect(res.status).toBe(200);
     expect(body.results).toEqual([
-      { clientEventId: "11111111-1111-4111-8111-111111111111", status: "accepted" },
-      { clientEventId: "22222222-2222-4222-8222-222222222222", status: "accepted" },
+      { clientEventId: EVENT_1, status: "rejected", reason: "La orden está en 'liberado' — ya no admite pesajes" },
+      { clientEventId: EVENT_2, status: "accepted" },
     ]);
-    // The order ends up at `pesado` via exactly one stage transition, not
-    // two, and not zero (i.e. it never got stuck, and it never errored).
-    expect(updateMany).toHaveBeenCalledTimes(1);
-    expect(updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "550e8400-e29b-41d4-a716-446655440000", status: "planificado" } }),
-    );
+    // Each event ran in its own transaction.
+    expect(withTenant).toHaveBeenCalledTimes(2);
   });
 
-  // Critical Finding 2 regression test.
+  it("reports an order/lot outside the caller's tenant (NOT_FOUND) as rejected", async () => {
+    applyWeighing.mockRejectedValueOnce(new TRPCError({ code: "NOT_FOUND", message: "Orden de producción no encontrada" }));
+    const body = await (await POST(makeRequest([weighingEvent()]))).json();
+    expect(body.results).toEqual([{ clientEventId: EVENT_1, status: "rejected", reason: "Orden de producción no encontrada" }]);
+  });
+
+  it("re-throws a genuinely unexpected error (transient 5xx, device retries later)", async () => {
+    applyWeighing.mockRejectedValueOnce(new Error("connection reset"));
+    await expect(POST(makeRequest([weighingEvent()]))).rejects.toThrow("connection reset");
+  });
+
   it("rejects a caller whose role is not allowed to capture offline events", async () => {
     requireRole.mockRejectedValueOnce(new MockForbiddenError());
     const res = await POST(makeRequest([weighingEvent()]));
     expect(res.status).toBe(403);
-    expect(create).not.toHaveBeenCalled();
+    expect(applyWeighing).not.toHaveBeenCalled();
   });
 
   it("rejects an unauthenticated caller", async () => {
     requireRole.mockRejectedValueOnce(new MockUnauthorizedError());
     const res = await POST(makeRequest([weighingEvent()]));
     expect(res.status).toBe(401);
-    expect(create).not.toHaveBeenCalled();
+    expect(applyWeighing).not.toHaveBeenCalled();
   });
 
-  // Important Finding 1 regression test.
-  it("rejects an event type other than 'weighing' — no dedicated offline-capture flow exists for it", async () => {
-    await expect(POST(makeRequest([weighingEvent({ eventType: "signature" })]))).rejects.toThrow();
-    expect(create).not.toHaveBeenCalled();
+  // Important 7b: malformed input is a permanent 4xx, never an uncaught 500
+  // that `sync-engine.ts` would retry forever.
+  it("returns 400 (not a thrown error / 500) for an event type other than 'weighing'", async () => {
+    const res = await POST(makeRequest([weighingEvent({ eventType: "signature" })]));
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(Array.isArray(body.issues)).toBe(true);
+    expect(applyWeighing).not.toHaveBeenCalled();
   });
 
-  it("rejects a payload missing the fields recordWeighingInput requires", async () => {
-    await expect(POST(makeRequest([weighingEvent({ payload: { rawMaterialLotId: "not-a-uuid" } })]))).rejects.toThrow();
-    expect(create).not.toHaveBeenCalled();
+  it("returns 400 for a payload missing the fields recordWeighingInput requires", async () => {
+    const res = await POST(makeRequest([weighingEvent({ payload: { rawMaterialLotId: "not-a-uuid" } })]));
+    expect(res.status).toBe(400);
+    expect(applyWeighing).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an unparseable occurredAt", async () => {
+    const res = await POST(makeRequest([weighingEvent({ occurredAt: "yesterday-ish" })]));
+    expect(res.status).toBe(400);
+    expect(applyWeighing).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a body that is not JSON at all", async () => {
+    const res = await POST(new Request("http://localhost/api/sync/events", { method: "POST", body: "{not json" }));
+    expect(res.status).toBe(400);
+    expect(applyWeighing).not.toHaveBeenCalled();
   });
 });

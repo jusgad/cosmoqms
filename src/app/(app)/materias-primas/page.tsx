@@ -13,6 +13,7 @@ export default async function MateriasPrimasPage() {
 
   const lots = await withTenant(user.tenantId, user.id, (tx) =>
     tx.rawMaterialLot.findMany({
+      where: { tenantId: user.tenantId },
       orderBy: { receivedAt: "desc" },
       include: { rawMaterial: true },
     }),

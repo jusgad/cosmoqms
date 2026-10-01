@@ -1,14 +1,14 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { SignaturePad } from "@/components/batch/SignaturePad";
+import { isSignableStage, STAGE_SIGNER_ROLES } from "@/lib/validation/production";
 
-// Only stages that actually have a meaning statement (i.e. a completed
-// production stage awaiting attestation) can be signed. "planificado" has
-// nothing to confirm yet, and "liberado"/"rechazado" are terminal QC
-// verdicts made by Task 12/13's own procedures, not this generic signature.
-const SIGNABLE_STAGES = new Set(["pesado", "mezclado", "envasado", "calidad"]);
-
+// Server Component gate: only a stage that is actually signable (a completed
+// production stage awaiting attestation — never "planificado" or the terminal
+// "liberado"/"rechazado" QC decisions), and only by a role allowed to sign
+// THAT stage (final review, Important 6). `production.sign` enforces both
+// server-side; this just avoids rendering a pad that could only fail.
 export default async function FirmaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
@@ -17,19 +17,23 @@ export default async function FirmaPage({ params }: { params: Promise<{ id: stri
   }
 
   const order = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findUniqueOrThrow({ where: { id } }),
+    tx.productionOrder.findFirst({ where: { id, tenantId: user.tenantId } }),
   );
+  if (!order) {
+    notFound();
+  }
 
-  if (!SIGNABLE_STAGES.has(order.status)) {
+  const stage = order.status;
+  if (!isSignableStage(stage) || !STAGE_SIGNER_ROLES[stage].includes(user.role)) {
     redirect(`/produccion/${order.id}`);
   }
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-sans text-2xl font-semibold text-foreground">
-        Firma electrónica — {order.orderNumber} ({order.status})
+        Firma electrónica — {order.orderNumber} ({stage})
       </h1>
-      <SignaturePad productionOrderId={order.id} stage={order.status} />
+      <SignaturePad productionOrderId={order.id} stage={stage} />
     </div>
   );
 }

@@ -12,7 +12,7 @@ export default async function FormulasPage() {
   }
 
   const formulas = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.masterFormula.findMany({ orderBy: { name: "asc" } }),
+    tx.masterFormula.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),
   );
 
   return (

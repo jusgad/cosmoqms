@@ -26,17 +26,59 @@ const WRITE_OPS = new Set(["create", "update", "delete", "createMany", "updateMa
 // `where` clause that filters by anything other than a literal id (e.g. a
 // bulk `createMany` with no `where` at all still records `"unknown"` — a
 // documented MVP limitation, not solved generically here).
-function extractRecordId(result: unknown, args: Record<string, unknown>): string {
-  if (result && typeof result === "object" && "id" in result) {
-    const id = (result as { id: unknown }).id;
-    if (typeof id === "string") return id;
-  }
+function whereId(args: Record<string, unknown>): string | undefined {
   const where = args.where;
   if (where && typeof where === "object" && "id" in where) {
     const id = (where as { id: unknown }).id;
     if (typeof id === "string") return id;
   }
-  return "unknown";
+  return undefined;
+}
+
+function extractRecordId(result: unknown, args: Record<string, unknown>): string {
+  if (result && typeof result === "object" && "id" in result) {
+    const id = (result as { id: unknown }).id;
+    if (typeof id === "string") return id;
+  }
+  return whereId(args) ?? "unknown";
+}
+
+// Final-review fix (Important 3): `AuditLog.beforeData` existed in the schema
+// but was never populated, and every regulated `updateMany` (the
+// TOCTOU-guarded stage advance in `advanceStageInternal`, the three deviation
+// transitions) produced an audit row whose `afterData` was just `{ count: 1 }`
+// — no record of what the row looked like before or after. For single-row
+// writes that target a literal `where.id` (every such call site in this
+// codebase), the hook now snapshots the row:
+//   - BEFORE the write, for update/updateMany/delete/deleteMany -> `beforeData`
+//   - AFTER the write, for updateMany -> `afterData` (instead of `{ count }`;
+//     `update` already returns the full row, and a delete has no "after").
+// Both reads go through `auditWriter` — the same bound transaction client the
+// audit row itself is written through — so they observe exactly the
+// transaction's own view of the row (the read-then-write-then-read happens
+// inside one transaction, so no other writer can interleave between the
+// snapshot and the write under the TOCTOU-guarded `where`). They are scoped to
+// this client's `tenantId` too; every regulated model carries `tenant_id`.
+// Reads issued here re-enter this same `$allOperations` hook as plain reads,
+// which are never audited, so there is no recursion.
+const SNAPSHOT_BEFORE_OPS = new Set(["update", "updateMany", "delete", "deleteMany"]);
+const SNAPSHOT_AFTER_OPS = new Set(["updateMany"]);
+
+type SnapshotDelegate = { findFirst: (args: { where: Record<string, unknown> }) => Promise<unknown> };
+
+// Prisma exposes model delegates on the client under the model name with a
+// lower-cased first letter (`ProductionOrder` -> `productionOrder`).
+function delegateFor(client: PrismaClient, model: string): SnapshotDelegate | undefined {
+  const key = model.charAt(0).toLowerCase() + model.slice(1);
+  const delegate = (client as unknown as Record<string, unknown>)[key];
+  if (delegate && typeof delegate === "object" && "findFirst" in delegate) {
+    return delegate as SnapshotDelegate;
+  }
+  return undefined;
+}
+
+function toJson(value: unknown): Prisma.InputJsonValue | undefined {
+  return value === null || value === undefined ? undefined : (value as Prisma.InputJsonValue);
 }
 
 export interface AuditedClient {
@@ -111,24 +153,36 @@ export function withAuditLog(prisma: PrismaClient, actorUserId: string, tenantId
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const result = await query(args);
-          if (model && REGULATED_MODELS.has(model) && WRITE_OPS.has(operation)) {
-            // Runs inside the same `prisma.$transaction` callback as the
-            // mutation it audits (see `withTenant` in db.ts) — if this
-            // `create` throws, the whole transaction rolls back, satisfying
-            // "if the audit write fails, the whole mutation must fail".
-            await auditWriter.auditLog.create({
-              data: {
-                tenantId,
-                tableName: model,
-                recordId: extractRecordId(result, args as Record<string, unknown>),
-                action: operation,
-                afterData: result as Prisma.InputJsonValue,
-                actorUserId,
-                occurredAt: new Date(),
-              },
-            });
+          const audited = Boolean(model && REGULATED_MODELS.has(model) && WRITE_OPS.has(operation));
+          if (!audited || !model) {
+            return query(args);
           }
+
+          const argsRecord = args as Record<string, unknown>;
+          const id = whereId(argsRecord);
+          const delegate = id ? delegateFor(auditWriter, model) : undefined;
+          const snapshot = () => delegate?.findFirst({ where: { id, tenantId } });
+
+          const beforeData = SNAPSHOT_BEFORE_OPS.has(operation) ? await snapshot() : undefined;
+          const result = await query(args);
+          const afterData = SNAPSHOT_AFTER_OPS.has(operation) && delegate ? ((await snapshot()) ?? result) : result;
+
+          // Runs inside the same `prisma.$transaction` callback as the
+          // mutation it audits (see `withTenant` in db.ts) — if this
+          // `create` throws, the whole transaction rolls back, satisfying
+          // "if the audit write fails, the whole mutation must fail".
+          await auditWriter.auditLog.create({
+            data: {
+              tenantId,
+              tableName: model,
+              recordId: extractRecordId(result, argsRecord),
+              action: operation,
+              beforeData: toJson(beforeData),
+              afterData: toJson(afterData),
+              actorUserId,
+              occurredAt: new Date(),
+            },
+          });
           return result;
         },
       },

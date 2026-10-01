@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { ReportDeviationForm } from "@/components/quality/ReportDeviationForm";
@@ -18,7 +18,12 @@ export default async function NuevaDesviacionPage({ params }: { params: Promise<
     redirect(`/produccion/${id}`);
   }
 
-  const order = await withTenant(user.tenantId, user.id, (tx) => tx.productionOrder.findUniqueOrThrow({ where: { id } }));
+  const order = await withTenant(user.tenantId, user.id, (tx) =>
+    tx.productionOrder.findFirst({ where: { id, tenantId: user.tenantId } }),
+  );
+  if (!order) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-col gap-4">

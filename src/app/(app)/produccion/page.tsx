@@ -33,7 +33,7 @@ export default async function ProduccionPage() {
   }
 
   const orders = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findMany({ orderBy: { orderNumber: "asc" }, include: { formula: true } }),
+    tx.productionOrder.findMany({ where: { tenantId: user.tenantId }, orderBy: { orderNumber: "asc" }, include: { formula: true } }),
   );
 
   const byStatus = (status: BatchStatus) => orders.filter((order) => order.status === status);

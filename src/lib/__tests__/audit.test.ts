@@ -161,4 +161,101 @@ describe("withAuditLog", () => {
 
     expect(outerCreated).toHaveLength(1);
   });
+
+  // Final-review fix (Important 3): a regulated single-row `updateMany`
+  // (where.id) records the row's real before/after state, not `{ count: 1 }`,
+  // read through the bound transaction client and scoped to the tenant.
+  it("snapshots before/after row state for an updateMany targeting a where.id", async () => {
+    const txCreated: AuditLogCreateArgs["data"][] = [];
+    const rows: Record<string, { id: string; status: string }> = { po1: { id: "po1", status: "planificado" } };
+    const findFirstCalls: unknown[] = [];
+    const txClient = {
+      auditLog: { create: async (args: AuditLogCreateArgs) => txCreated.push(args.data) },
+      productionOrder: {
+        findFirst: async (args: { where: { id: string } }) => {
+          findFirstCalls.push(args);
+          return { ...rows[args.where.id] };
+        },
+      },
+    } as unknown as PrismaClient;
+
+    const { client, bindTransactionClient } = withAuditLog(fakePrisma([]), "actor-1", "tenant-1");
+    bindTransactionClient(txClient);
+    const query = getAllOperations(client);
+
+    const result = await query({
+      model: "ProductionOrder",
+      operation: "updateMany",
+      args: { where: { id: "po1", tenantId: "tenant-1", status: "planificado" }, data: { status: "pesado" } },
+      query: async () => {
+        rows.po1 = { id: "po1", status: "pesado" };
+        return { count: 1 };
+      },
+    });
+
+    // The caller still gets Prisma's own `{ count }` result back.
+    expect(result).toEqual({ count: 1 });
+    expect(findFirstCalls).toEqual([
+      { where: { id: "po1", tenantId: "tenant-1" } },
+      { where: { id: "po1", tenantId: "tenant-1" } },
+    ]);
+    expect(txCreated).toHaveLength(1);
+    expect(txCreated[0]).toMatchObject({
+      tableName: "ProductionOrder",
+      action: "updateMany",
+      recordId: "po1",
+      beforeData: { id: "po1", status: "planificado" },
+      afterData: { id: "po1", status: "pesado" },
+    });
+  });
+
+  it("records beforeData for a single-row update (afterData stays the returned row)", async () => {
+    const txCreated: AuditLogCreateArgs["data"][] = [];
+    const txClient = {
+      auditLog: { create: async (args: AuditLogCreateArgs) => txCreated.push(args.data) },
+      deviation: { findFirst: async () => ({ id: "dev1", status: "abierta" }) },
+    } as unknown as PrismaClient;
+
+    const { client, bindTransactionClient } = withAuditLog(fakePrisma([]), "actor-1", "tenant-1");
+    bindTransactionClient(txClient);
+
+    await getAllOperations(client)({
+      model: "Deviation",
+      operation: "update",
+      args: { where: { id: "dev1" }, data: { status: "en_investigacion" } },
+      query: async () => ({ id: "dev1", status: "en_investigacion" }),
+    });
+
+    expect(txCreated[0]).toMatchObject({
+      beforeData: { id: "dev1", status: "abierta" },
+      afterData: { id: "dev1", status: "en_investigacion" },
+    });
+  });
+
+  it("does not snapshot (no reads) for a create", async () => {
+    const txCreated: AuditLogCreateArgs["data"][] = [];
+    let reads = 0;
+    const txClient = {
+      auditLog: { create: async (args: AuditLogCreateArgs) => txCreated.push(args.data) },
+      qcResult: {
+        findFirst: async () => {
+          reads++;
+          return null;
+        },
+      },
+    } as unknown as PrismaClient;
+    const { client, bindTransactionClient } = withAuditLog(fakePrisma([]), "actor-1", "tenant-1");
+    bindTransactionClient(txClient);
+
+    await getAllOperations(client)({
+      model: "QcResult",
+      operation: "create",
+      args: { data: { result: "pass" } },
+      query: async () => ({ id: "qc1", result: "pass" }),
+    });
+
+    expect(reads).toBe(0);
+    expect(txCreated[0].beforeData).toBeUndefined();
+    expect(txCreated[0]).toMatchObject({ afterData: { id: "qc1", result: "pass" } });
+  });
 });

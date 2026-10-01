@@ -63,6 +63,10 @@ const FORMULA_INGREDIENT_IDS = {
 
 async function main(): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    // Same tenant context `withTenant` (src/lib/db.ts) establishes, so this
+    // seed also works once supabase/rls.sql is applied and the connection
+    // role is subject to RLS (every policy compares against this setting).
+    await tx.$executeRaw`SELECT set_config('app.current_tenant_id', ${ORG_ID}, true)`;
     const org = await tx.organization.upsert({
       where: { id: ORG_ID },
       update: {

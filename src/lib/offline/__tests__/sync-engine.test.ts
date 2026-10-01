@@ -20,7 +20,7 @@ vi.mock("../db", () => ({
 type MockFetchResponse = {
   ok: boolean;
   status?: number;
-  json: () => Promise<{ success: boolean; results: { clientEventId: string; status: string }[] }>;
+  json: () => Promise<{ success: boolean; results: { clientEventId: string; status: string; reason?: string }[] }>;
 };
 
 const fetchMock = vi.fn(
@@ -144,5 +144,40 @@ describe("sync-engine", () => {
     expect(result).toEqual({ pushed: 0, duplicates: 0, failed: 0 });
     expect(events[0].failedAt).toBeUndefined();
     expect(events[0].pushedAt).toBeUndefined();
+  });
+
+  // Final review (Important 7a): a per-event business-rule rejection marks
+  // ONLY that event failed (with the server's reason); the rest of the batch
+  // is still marked pushed.
+  it("marks only the server-rejected event failed, with the server's reason", async () => {
+    for (const id of ["e1", "e2"]) {
+      events.push({
+        clientEventId: id,
+        productionOrderId: "po1",
+        eventType: "weighing",
+        payload: {},
+        occurredAt: "now",
+        deviceId: "d1",
+      });
+    }
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        results: [
+          { clientEventId: "e1", status: "rejected", reason: "La orden está en 'liberado' — ya no admite pesajes" },
+          { clientEventId: "e2", status: "accepted" },
+        ],
+      }),
+    });
+
+    const result = await syncPendingEvents();
+
+    expect(result).toEqual({ pushed: 1, duplicates: 0, failed: 1 });
+    expect(events[0].failedAt).toBeDefined();
+    expect(events[0].pushedAt).toBeUndefined();
+    expect(events[0].lastError).toBe("La orden está en 'liberado' — ya no admite pesajes");
+    expect(events[1].pushedAt).toBeDefined();
+    expect(events[1].failedAt).toBeUndefined();
   });
 });

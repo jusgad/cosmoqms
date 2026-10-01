@@ -62,17 +62,30 @@ export const deviationsRouter = router({
   getById: roleProcedure("calidad", "director_tecnico", "jefe_planta", "operario")
     .input(z.object({ id: z.string().uuid() }))
     .query(({ ctx, input }) =>
-      tenantTx(ctx, (tx) => tx.deviation.findUniqueOrThrow({ where: { id: input.id } })),
+      tenantTx(ctx, async (tx) => {
+        const deviation = await tx.deviation.findFirst({ where: { id: input.id, tenantId: ctx.user.tenantId } });
+        if (!deviation) throw new TRPCError({ code: "NOT_FOUND", message: "Desviación no encontrada" });
+        return deviation;
+      }),
     ),
 
+  // Final review (Critical 2): the client-supplied `productionOrderId` is
+  // verified to belong to the caller's tenant before the deviation is
+  // written — a deviation must never be attached to another tenant's batch
+  // (where it would also block that tenant's release).
   create: roleProcedure("calidad", "jefe_planta", "operario")
     .input(createDeviationInput)
     .mutation(({ ctx, input }) =>
-      tenantTx(ctx, (tx) =>
-        tx.deviation.create({
+      tenantTx(ctx, async (tx) => {
+        const order = await tx.productionOrder.findFirst({
+          where: { id: input.productionOrderId, tenantId: ctx.user.tenantId },
+          select: { id: true },
+        });
+        if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Orden de producción no encontrada" });
+        return tx.deviation.create({
           data: { tenantId: ctx.user.tenantId, ...input, raisedBy: ctx.user.id, status: "abierta" },
-        }),
-      ),
+        });
+      }),
     ),
 
   // Step 1 of 2 (task 13 review round 1, Sebas's decision): marks who/when
@@ -100,7 +113,7 @@ export const deviationsRouter = router({
             message: "La desviación no está en estado 'abierta'",
           });
         }
-        return tx.deviation.findUniqueOrThrow({ where: { id: input.id } });
+        return tx.deviation.findFirstOrThrow({ where: { id: input.id, tenantId: ctx.user.tenantId } });
       }),
     ),
 
@@ -127,7 +140,7 @@ export const deviationsRouter = router({
             message: "La desviación no está en estado 'en_investigacion' — inicie la investigación primero",
           });
         }
-        return tx.deviation.findUniqueOrThrow({ where: { id: input.id } });
+        return tx.deviation.findFirstOrThrow({ where: { id: input.id, tenantId: ctx.user.tenantId } });
       }),
     ),
 
@@ -152,7 +165,7 @@ export const deviationsRouter = router({
             message: "La desviación no está pendiente de aprobación",
           });
         }
-        return tx.deviation.findUniqueOrThrow({ where: { id: input.id } });
+        return tx.deviation.findFirstOrThrow({ where: { id: input.id, tenantId: ctx.user.tenantId } });
       }),
     ),
 });
