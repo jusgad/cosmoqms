@@ -1,35 +1,28 @@
 import { describe, it, expect, vi } from "vitest";
-import type { Prisma } from "@prisma/client";
 
-// Zero-`any` precedent (Tasks 6-9): mocks are typed against the actual
-// Prisma delegate call shapes rather than using `any`.
-type CreateArgs = Prisma.BatchEventCreateArgs;
+// Final review (Important 7c): all weighing validation/stock/stage logic now
+// lives in `applyWeighing` (covered in lib/production/__tests__/weighing.test.ts).
+// This test only verifies the tRPC procedure wires the caller's tenant/actor
+// into it and returns the tenant-scoped order.
+const { applyWeighing } = vi.hoisted(() => ({ applyWeighing: vi.fn(async () => ({ id: "ev1" })) }));
+vi.mock("@/lib/production/weighing", () => ({ applyWeighing, assertAllIngredientsWeighed: vi.fn() }));
 
-const create = vi.fn(async (args: CreateArgs) => ({ id: "ev1", ...args.data }));
-const findUniqueOrThrow = vi.fn(async () => ({ id: "po1", status: "planificado" as const }));
-// Review round 1 fix (Finding 2, TOCTOU guard): `advanceStageInternal` now
-// pins its write with `updateMany({ where: { id, status: from } })` instead
-// of a bare `update`, so the mock must provide `updateMany` returning a
-// `{ count }` — `1` here simulates the common case where nothing else raced
-// this transaction. The call args are asserted via `toHaveBeenCalledWith`
-// below, not read inside the mock, so no parameter is declared here.
-const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
-
+const findFirst = vi.fn(async () => ({ id: "po1", status: "pesado" as const }));
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
-    fn({ batchEvent: { create }, productionOrder: { findUniqueOrThrow, updateMany } }),
+    fn({ productionOrder: { findFirst } }),
 }));
 
 import { productionRouter } from "../production";
 
 describe("production.recordWeighing", () => {
-  it("writes a batch_events row and advances the order to 'pesado'", async () => {
+  it("delegates to applyWeighing with the caller's tenant/actor and returns the tenant-scoped order", async () => {
     const caller = productionRouter.createCaller({
       user: { id: "u1", tenantId: "t1", role: "operario" },
       prisma: {} as never,
     });
 
-    await caller.recordWeighing({
+    const result = await caller.recordWeighing({
       productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
       rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440001",
       theoreticalQty: 12.5,
@@ -38,14 +31,36 @@ describe("production.recordWeighing", () => {
       occurredAt: new Date().toISOString(),
     });
 
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ eventType: "weighing" }) }),
-    );
-    expect(updateMany).toHaveBeenCalledWith(
+    expect(applyWeighing).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
-        where: { id: "550e8400-e29b-41d4-a716-446655440000", status: "planificado" },
-        data: { status: "pesado" },
+        tenantId: "t1",
+        actorUserId: "u1",
+        productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
+        rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440001",
+        actualQty: 12.48,
       }),
     );
+    // The client's `theoreticalQty` is never forwarded — the server recomputes it.
+    expect(applyWeighing).toHaveBeenCalledWith(expect.anything(), expect.not.objectContaining({ theoreticalQty: 12.5 }));
+    expect(findFirst).toHaveBeenCalledWith({ where: { id: "550e8400-e29b-41d4-a716-446655440000", tenantId: "t1" } });
+    expect(result.status).toBe("pesado");
+  });
+
+  it("rejects a role that cannot capture weighings", async () => {
+    const caller = productionRouter.createCaller({
+      user: { id: "u1", tenantId: "t1", role: "calidad" },
+      prisma: {} as never,
+    });
+    await expect(
+      caller.recordWeighing({
+        productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
+        rawMaterialLotId: "550e8400-e29b-41d4-a716-446655440001",
+        theoreticalQty: 12.5,
+        actualQty: 12.48,
+        clientEventId: "11111111-1111-4111-8111-111111111111",
+        occurredAt: new Date().toISOString(),
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

@@ -1,7 +1,7 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
-import { ReleasePad } from "@/components/quality/ReleasePad";
+import { QcDecisionPad } from "@/components/quality/QcDecisionPad";
 
 // Same shape as firma/page.tsx (Task 11): a Server Component gate that
 // re-checks role and stage server-side before rendering the client
@@ -15,8 +15,11 @@ export default async function LiberarPage({ params }: { params: Promise<{ id: st
   }
 
   const order = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findUniqueOrThrow({ where: { id } }),
+    tx.productionOrder.findFirst({ where: { id, tenantId: user.tenantId } }),
   );
+  if (!order) {
+    notFound();
+  }
 
   if (user.role !== "director_tecnico" || order.status !== "calidad") {
     redirect(`/produccion/${order.id}`);
@@ -27,7 +30,7 @@ export default async function LiberarPage({ params }: { params: Promise<{ id: st
       <h1 className="font-sans text-2xl font-semibold text-foreground">
         Liberación de lote — {order.orderNumber}
       </h1>
-      <ReleasePad productionOrderId={order.id} />
+      <QcDecisionPad productionOrderId={order.id} decision="release" />
     </div>
   );
 }

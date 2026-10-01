@@ -7,7 +7,14 @@ export async function queueEvent(event: PendingEvent): Promise<void> {
   await db.pendingEvents.add(event);
 }
 
-type SyncResult = { clientEventId: string; status: "accepted" | "duplicate" };
+// `rejected` (final review, Important 7a): the server refused THIS event on a
+// business rule (e.g. its batch is already closed, the lot isn't released,
+// insufficient stock). Like a 4xx it will never succeed by retrying, so it is
+// marked `failedAt` with the server's reason — but only that event, not the
+// rest of the batch, which was processed independently.
+type SyncResult =
+  | { clientEventId: string; status: "accepted" | "duplicate" }
+  | { clientEventId: string; status: "rejected"; reason: string };
 
 export async function syncPendingEvents(): Promise<{ pushed: number; duplicates: number; failed: number }> {
   // Review round 1 fix (Important Finding 2): a previously hard-failed event
@@ -35,9 +42,11 @@ export async function syncPendingEvents(): Promise<{ pushed: number; duplicates:
   // auth, a malformed event/eventType that will never parse) — not "try
   // again later." Marking every event in the batch `failedAt` here is
   // deliberately coarse (the whole batch, not just the offending event):
-  // `/api/sync/events` validates the whole request body in one `zod.parse`
-  // call before processing any event, so one malformed event already
-  // prevents the rest of the batch from being attempted at all.
+  // `/api/sync/events` validates the whole request body in one `safeParse`
+  // call before processing any event (400 on failure), so one malformed
+  // event already prevents the rest of the batch from being attempted at all.
+  // Per-event BUSINESS-rule rejections are reported individually instead
+  // (`status: "rejected"`, handled below).
   if (res.status >= 400 && res.status < 500) {
     const failedAt = new Date().toISOString();
     const lastError = `HTTP ${res.status}`;
@@ -55,10 +64,16 @@ export async function syncPendingEvents(): Promise<{ pushed: number; duplicates:
   const body = (await res.json()) as { success: boolean; results: SyncResult[] };
   let pushed = 0;
   let duplicates = 0;
+  let failed = 0;
   for (const r of body.results) {
+    if (r.status === "rejected") {
+      await db.pendingEvents.update(r.clientEventId, { failedAt: new Date().toISOString(), lastError: r.reason });
+      failed++;
+      continue;
+    }
     await db.pendingEvents.update(r.clientEventId, { pushedAt: new Date().toISOString() });
     if (r.status === "accepted") pushed++;
     else duplicates++;
   }
-  return { pushed, duplicates, failed: 0 };
+  return { pushed, duplicates, failed };
 }

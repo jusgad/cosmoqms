@@ -20,9 +20,9 @@ export async function GET(req: Request) {
 
   const [activeFormulas, availableLots] = await withTenant(user.tenantId, user.id, (tx) =>
     Promise.all([
-      tx.masterFormula.findMany({ where: { status: "active" }, orderBy: { name: "asc" } }),
+      tx.masterFormula.findMany({ where: { tenantId: user.tenantId, status: "active" }, orderBy: { name: "asc" } }),
       tx.rawMaterialLot.findMany({
-        where: { status: "liberado", quantityAvailable: { gt: 0 } },
+        where: { tenantId: user.tenantId, status: "liberado", quantityAvailable: { gt: 0 } },
         include: { rawMaterial: true },
         orderBy: { receivedAt: "asc" },
       }),

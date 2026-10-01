@@ -1,43 +1,116 @@
-import { describe, it, expect, vi } from "vitest";
-import type { FormulaIngredient, MasterFormula } from "@prisma/client";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { TRPCError } from "@trpc/server";
 
-type FormulaWithIngredients = MasterFormula & { ingredients: FormulaIngredient[] };
+type MockFormula = { id: string; status: string; ingredients: { percentage: number }[] };
 
-const findUniqueOrThrow = vi.fn(
-  async (): Promise<Partial<FormulaWithIngredients>> => ({
-    id: "f1",
-    ingredients: [
-      { percentage: 60 } as unknown as FormulaIngredient,
-      { percentage: 39 } as unknown as FormulaIngredient,
-    ],
-  }),
-);
-const update = vi.fn();
+let formula: MockFormula | null;
+let rawMaterial: { id: string } | null;
+let activateCount: number;
+
+const formulaFindFirst = vi.fn(async (): Promise<MockFormula | null> => formula);
+const formulaFindFirstOrThrow = vi.fn(async () => ({ ...formula, status: "active" }));
+const formulaUpdateMany = vi.fn(async () => ({ count: activateCount }));
+const rawMaterialFindFirst = vi.fn(async () => rawMaterial);
+const ingredientCreate = vi.fn(async () => ({ id: "ing1" }));
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
-    fn({ masterFormula: { findUniqueOrThrow, update } }),
+    fn({
+      masterFormula: { findFirst: formulaFindFirst, findFirstOrThrow: formulaFindFirstOrThrow, updateMany: formulaUpdateMany },
+      rawMaterial: { findFirst: rawMaterialFindFirst },
+      formulaIngredient: { create: ingredientCreate },
+    }),
 }));
 
 import { formulasRouter } from "../formulas";
-import { TRPCError } from "@trpc/server";
+
+const FORMULA_ID = "550e8400-e29b-41d4-a716-446655440000";
+const RAW_MATERIAL_ID = "550e8400-e29b-41d4-a716-446655440001";
+
+const caller = (role: "calidad" | "jefe_planta") =>
+  formulasRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
+
+async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
+  const err = await promise.then(() => undefined).catch((e: unknown) => e);
+  return err instanceof TRPCError ? err.code : undefined;
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  formula = { id: FORMULA_ID, status: "draft", ingredients: [{ percentage: 60 }, { percentage: 40 }] };
+  rawMaterial = { id: RAW_MATERIAL_ID };
+  activateCount = 1;
+});
 
 describe("formulas.activate", () => {
+  // `calidad` is the only role allowed to activate, so a BAD_REQUEST here
+  // genuinely comes from the composition check. (The previous version passed
+  // the non-uuid id "f1", so it was rejected by Zod input validation with
+  // the same BAD_REQUEST code and never reached the 100% rule at all.)
   it("rejects activation when ingredients don't sum to ~100%", async () => {
-    // NOTE: deviating from the brief's literal `role: "jefe_planta"` here.
-    // `activate` is gated to `calidad` only (brief Step 7), so a
-    // `jefe_planta` caller would be rejected with FORBIDDEN before ever
-    // reaching the tolerance check — the assertion below would pass
-    // trivially without exercising the 100% rule at all. Using `calidad`
-    // (the role actually allowed to activate) makes the test verify what it
-    // claims to verify: that BAD_REQUEST comes from the composition check.
-    const caller = formulasRouter.createCaller({
-      user: { id: "u1", tenantId: "t1", role: "calidad" },
-      prisma: {} as never,
-    });
-    const error = await caller.activate({ id: "f1" }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(TRPCError);
+    formula = { ...formula!, ingredients: [{ percentage: 60 }, { percentage: 39 }] };
+    const error = await caller("calidad")
+      .activate({ id: FORMULA_ID })
+      .catch((e: unknown) => e);
     expect((error as TRPCError).code).toBe("BAD_REQUEST");
-    expect(update).not.toHaveBeenCalled();
+    expect((error as TRPCError).message).toContain("99");
+    expect(formulaUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("activates a draft whose ingredients sum to 100%, guarding the write on status draft + tenant", async () => {
+    await caller("calidad").activate({ id: FORMULA_ID });
+    expect(formulaFindFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: FORMULA_ID, tenantId: "t1" } }));
+    expect(formulaUpdateMany).toHaveBeenCalledWith({
+      where: { id: FORMULA_ID, tenantId: "t1", status: "draft" },
+      data: expect.objectContaining({ status: "active", approvedBy: "u1" }),
+    });
+  });
+
+  // Final review (Important 8).
+  it.each(["active", "archived"])("refuses to activate a formula that is '%s'", async (status) => {
+    formula = { ...formula!, status };
+    expect(await codeOf(caller("calidad").activate({ id: FORMULA_ID }))).toBe("BAD_REQUEST");
+    expect(formulaUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("throws CONFLICT if the formula left draft between the read and the guarded write", async () => {
+    activateCount = 0;
+    expect(await codeOf(caller("calidad").activate({ id: FORMULA_ID }))).toBe("CONFLICT");
+  });
+
+  it("treats a formula outside the caller's tenant as NOT_FOUND", async () => {
+    formula = null;
+    expect(await codeOf(caller("calidad").activate({ id: FORMULA_ID }))).toBe("NOT_FOUND");
+  });
+});
+
+describe("formulas.addIngredient", () => {
+  const input = { formulaId: FORMULA_ID, rawMaterialId: RAW_MATERIAL_ID, percentage: 10, orderIndex: 0 };
+
+  it("adds an ingredient to a draft formula after verifying both ids belong to the tenant", async () => {
+    await caller("jefe_planta").addIngredient(input);
+    expect(formulaFindFirst).toHaveBeenCalledWith({ where: { id: FORMULA_ID, tenantId: "t1" } });
+    expect(rawMaterialFindFirst).toHaveBeenCalledWith({ where: { id: RAW_MATERIAL_ID, tenantId: "t1" } });
+    expect(ingredientCreate).toHaveBeenCalledWith({ data: input });
+  });
+
+  // Final review (Important 8).
+  it.each(["active", "archived"])("refuses to modify a formula that is '%s'", async (status) => {
+    formula = { ...formula!, status };
+    expect(await codeOf(caller("jefe_planta").addIngredient(input))).toBe("BAD_REQUEST");
+    expect(ingredientCreate).not.toHaveBeenCalled();
+  });
+
+  // Final review (Critical 2): no cross-tenant foreign keys.
+  it("rejects a formula outside the caller's tenant", async () => {
+    formula = null;
+    expect(await codeOf(caller("jefe_planta").addIngredient(input))).toBe("NOT_FOUND");
+    expect(ingredientCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a raw material outside the caller's tenant", async () => {
+    rawMaterial = null;
+    expect(await codeOf(caller("jefe_planta").addIngredient(input))).toBe("NOT_FOUND");
+    expect(ingredientCreate).not.toHaveBeenCalled();
   });
 });

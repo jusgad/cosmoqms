@@ -12,7 +12,7 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
   }
 
   const lot = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.rawMaterialLot.findUnique({ where: { id }, include: { rawMaterial: true } }),
+    tx.rawMaterialLot.findFirst({ where: { id, tenantId: user.tenantId }, include: { rawMaterial: true } }),
   );
 
   if (!lot) {

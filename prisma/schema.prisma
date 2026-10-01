@@ -134,7 +134,7 @@ model FormulaIngredient {
 model ProductionOrder {
   id              String              @id @default(uuid())
   tenantId        String              @map("tenant_id")
-  orderNumber     String              @unique @map("order_number")
+  orderNumber     String              @map("order_number")
   formulaId       String              @map("formula_id")
   formulaVersion  Int                 @map("formula_version")
   plannedQuantity Decimal             @map("planned_quantity")
@@ -151,6 +151,17 @@ model ProductionOrder {
   qcResults       QcResult[]
   finishedLot     FinishedProductLot?
 
+  // Final-review fix (Critical 1): `orderNumber` used to carry a bare,
+  // GLOBAL `@unique`, but `generateOrderNumber` numbers orders consecutively
+  // PER TENANT (`OP-<year>-001`, `-002`, ...). The second tenant's very first
+  // order therefore always collided with the first tenant's `OP-<year>-001`
+  // (P2002) — no tenant after the first could ever create an order. The
+  // uniqueness guarantee is per-tenant, matching `RawMaterial`/
+  // `MasterFormula`/`FinishedProductLot`'s own `@@unique([tenantId, ...])`
+  // keys. Edited directly without `prisma migrate dev` (Task 3 / live DB
+  // still BLOCKED — same precedent as the Deviation fields above); the
+  // migration is generated once a database exists.
+  @@unique([tenantId, orderNumber])
   @@index([tenantId, status])
   @@map("production_orders")
 }

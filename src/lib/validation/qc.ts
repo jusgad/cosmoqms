@@ -34,3 +34,15 @@ export type ReleaseValues = z.infer<typeof releaseInput>;
 
 export const RELEASE_MEANING_STATEMENT =
   "Confirmo que reviso los resultados de calidad y libero este lote para su comercialización";
+
+// Final-review fix (Important 4): rejecting a batch (`calidad -> rechazado`)
+// is as consequential a signature as releasing it, so it takes the exact
+// same input shape and guarantees as `releaseInput` (Zod-level
+// `reauthVerified: z.literal(true)` + explicit meaning statement, plus the
+// router's own server-side reverification check).
+export const rejectInput = releaseInput;
+
+export type RejectValues = z.infer<typeof rejectInput>;
+
+export const REJECT_MEANING_STATEMENT =
+  "Confirmo que reviso los resultados de calidad y rechazo este lote: no puede comercializarse";

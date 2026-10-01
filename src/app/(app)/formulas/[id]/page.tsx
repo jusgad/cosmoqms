@@ -12,8 +12,8 @@ export default async function FormulaDetailPage({ params }: { params: Promise<{ 
   }
 
   const formula = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.masterFormula.findUnique({
-      where: { id },
+    tx.masterFormula.findFirst({
+      where: { id, tenantId: user.tenantId },
       include: { ingredients: { include: { rawMaterial: true }, orderBy: { orderIndex: "asc" } } },
     }),
   );
