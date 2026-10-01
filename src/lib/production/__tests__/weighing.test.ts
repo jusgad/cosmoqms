@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { applyWeighing, assertAllIngredientsWeighed } from "../weighing";
+import { applyWeighing, assertAllIngredientsWeighed, getMissingIngredients, WEIGHABLE_STATUSES } from "../weighing";
 
 // Final-review fix (Important 7c + Critical 2): `applyWeighing` is the single
 // server-side weighing implementation shared by `production.recordWeighing`
@@ -191,5 +191,61 @@ describe("assertAllIngredientsWeighed", () => {
   it("fails when nothing was weighed at all", async () => {
     eventFindMany.mockResolvedValueOnce([]);
     expect(await codeOf(assertAllIngredientsWeighed(tx, "t1", target))).toBe("BAD_REQUEST");
+  });
+});
+
+// Final review wrap-up: `getMissingIngredients` backs the "Registrar pesaje"
+// link on `produccion/[id]/page.tsx` — it must keep reporting the remaining
+// ingredients (not just an all-or-nothing pass/fail) once the order is
+// `pesado`, since that's exactly the status where the button would otherwise
+// vanish after only the first ingredient of a multi-ingredient formula.
+describe("getMissingIngredients", () => {
+  const target = { id: ORDER_ID, formulaId: "f1" };
+
+  beforeEach(() => {
+    ingredientFindMany.mockResolvedValue([
+      { rawMaterialId: "rm1" },
+      { rawMaterialId: "rm2" },
+      { rawMaterialId: "rm3" },
+    ]);
+  });
+
+  it("reports every ingredient as missing when nothing was weighed yet", async () => {
+    eventFindMany.mockResolvedValueOnce([]);
+    const missing = await getMissingIngredients(tx, "t1", target);
+    expect(missing).toEqual([{ rawMaterialId: "rm1" }, { rawMaterialId: "rm2" }, { rawMaterialId: "rm3" }]);
+  });
+
+  it("reports only the ingredients that still lack a weighing", async () => {
+    eventFindMany.mockResolvedValueOnce([{ payload: { rawMaterialLotId: "lotA" } }]);
+    lotFindMany.mockResolvedValueOnce([{ rawMaterialId: "rm1" }]);
+    const missing = await getMissingIngredients(tx, "t1", target);
+    expect(missing).toEqual([{ rawMaterialId: "rm2" }, { rawMaterialId: "rm3" }]);
+  });
+
+  it("reports nothing missing once every ingredient has a weighing", async () => {
+    eventFindMany.mockResolvedValueOnce([
+      { payload: { rawMaterialLotId: "lotA" } },
+      { payload: { rawMaterialLotId: "lotB" } },
+      { payload: { rawMaterialLotId: "lotC" } },
+    ]);
+    lotFindMany.mockResolvedValueOnce([
+      { rawMaterialId: "rm1" },
+      { rawMaterialId: "rm2" },
+      { rawMaterialId: "rm3" },
+    ]);
+    const missing = await getMissingIngredients(tx, "t1", target);
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("WEIGHABLE_STATUSES", () => {
+  // This is the exact set `produccion/[id]/page.tsx` checks to decide whether
+  // to show "Registrar pesaje" — it must include 'pesado', not just
+  // 'planificado', or multi-ingredient formulas get stuck after the first
+  // weighing (which advances the order out of 'planificado').
+  it("includes both planificado and pesado", () => {
+    expect(WEIGHABLE_STATUSES).toContain("planificado");
+    expect(WEIGHABLE_STATUSES).toContain("pesado");
   });
 });
