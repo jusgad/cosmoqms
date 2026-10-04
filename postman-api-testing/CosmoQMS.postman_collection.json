@@ -1,0 +1,497 @@
+{
+  "info": {
+    "name": "CosmoQMS API",
+    "description": "Colección de Postman para probar las APIs reales de CosmoQMS: 3 rutas REST (Next.js Route Handlers) y 23 procedimientos tRPC (sync/materias primas/fórmulas/producción/calidad/desviaciones/trazabilidad/auditoría). Todas las rutas requieren sesión de Clerk — configura la variable {{cookie}} en el environment antes de ejecutar cualquier petición.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "cookie", "value": "PEGA_AQUI_LA_COOKIE_COPIADA_DEL_NAVEGADOR" },
+    { "key": "productionOrderId", "value": "UUID_DE_UNA_ORDEN_DE_PRODUCCION" },
+    { "key": "rawMaterialId", "value": "UUID_DE_UNA_MATERIA_PRIMA" },
+    { "key": "rawMaterialLotId", "value": "UUID_DE_UN_LOTE_DE_MATERIA_PRIMA" },
+    { "key": "formulaId", "value": "UUID_DE_UNA_FORMULA" },
+    { "key": "deviationId", "value": "UUID_DE_UNA_DESVIACION" }
+  ],
+  "item": [
+    {
+      "name": "REST",
+      "item": [
+        {
+          "name": "GET sync/state (datos para la UI offline)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/sync/state", "host": ["{{baseUrl}}"], "path": ["api", "sync", "state"] }
+          }
+        },
+        {
+          "name": "POST sync/events (ingesta de pesajes offline)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"clientEventId\": \"{{$guid}}\",\n      \"productionOrderId\": \"{{productionOrderId}}\",\n      \"eventType\": \"weighing\",\n      \"payload\": {\n        \"rawMaterialLotId\": \"{{rawMaterialLotId}}\",\n        \"theoreticalQty\": 12,\n        \"actualQty\": 12.05\n      },\n      \"occurredAt\": \"2026-10-04T10:00:00.000Z\",\n      \"deviceId\": \"postman-test\"\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/sync/events", "host": ["{{baseUrl}}"], "path": ["api", "sync", "events"] }
+          }
+        },
+        {
+          "name": "GET pdf/batch/:id (PDF del registro de lote)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/pdf/batch/{{productionOrderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pdf", "batch", "{{productionOrderId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Materias Primas",
+      "item": [
+        {
+          "name": "materials.list",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/materials.list", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "materials.list"] }
+          }
+        },
+        {
+          "name": "materials.getById",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/materials.getById?input={{encodedInputId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "materials.getById"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"id\":\"{{rawMaterialId}}\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "materials.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"code\": \"MP-010\",\n    \"name\": \"Aceite de jojoba\",\n    \"unit\": \"kg\",\n    \"category\": \"Activo\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/materials.create", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "materials.create"] }
+          }
+        },
+        {
+          "name": "materials.receiveLot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"rawMaterialId\": \"{{rawMaterialId}}\",\n    \"supplierLotCode\": \"LOTE-0001\",\n    \"quantityReceived\": 50,\n    \"expiryDate\": \"2027-06-01\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/materials.receiveLot", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "materials.receiveLot"] }
+          }
+        },
+        {
+          "name": "materials.setStatus",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{rawMaterialLotId}}\",\n    \"status\": \"liberado\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/materials.setStatus", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "materials.setStatus"] }
+          }
+        },
+        {
+          "name": "materials.listLots",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/materials.listLots", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "materials.listLots"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Fórmulas",
+      "item": [
+        {
+          "name": "formulas.list",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/formulas.list", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "formulas.list"] }
+          }
+        },
+        {
+          "name": "formulas.listActive",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/formulas.listActive", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "formulas.listActive"] }
+          }
+        },
+        {
+          "name": "formulas.getById",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/formulas.getById?input={\"json\":{\"id\":\"{{formulaId}}\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "formulas.getById"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"id\":\"{{formulaId}}\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "formulas.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"code\": \"FM-010\",\n    \"name\": \"Crema hidratante FPS 30\",\n    \"productType\": \"Crema\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/formulas.create", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "formulas.create"] }
+          }
+        },
+        {
+          "name": "formulas.addIngredient",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"formulaId\": \"{{formulaId}}\",\n    \"rawMaterialId\": \"{{rawMaterialId}}\",\n    \"percentage\": 12,\n    \"orderIndex\": 0\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/formulas.addIngredient", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "formulas.addIngredient"] }
+          }
+        },
+        {
+          "name": "formulas.activate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"json\": {\n    \"id\": \"{{formulaId}}\"\n  }\n}" },
+            "url": { "raw": "{{baseUrl}}/api/trpc/formulas.activate", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "formulas.activate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Producción",
+      "item": [
+        {
+          "name": "production.list",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/production.list", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "production.list"] }
+          }
+        },
+        {
+          "name": "production.getById",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/production.getById?input={\"json\":{\"id\":\"{{productionOrderId}}\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "production.getById"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"id\":\"{{productionOrderId}}\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "production.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"formulaId\": \"{{formulaId}}\",\n    \"plannedQuantity\": 100\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/production.create", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "production.create"] }
+          }
+        },
+        {
+          "name": "production.recordWeighing",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"rawMaterialLotId\": \"{{rawMaterialLotId}}\",\n    \"theoreticalQty\": 12,\n    \"actualQty\": 12.05,\n    \"clientEventId\": \"{{$guid}}\",\n    \"occurredAt\": \"2026-10-04T10:00:00.000Z\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/production.recordWeighing", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "production.recordWeighing"] }
+          }
+        },
+        {
+          "name": "production.sign",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"stage\": \"pesado\",\n    \"meaningStatement\": \"Confirmo que realice el pesaje conforme a la formula maestra\",\n    \"reauthVerified\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/production.sign", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "production.sign"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Calidad",
+      "item": [
+        {
+          "name": "qc.listPending",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/qc.listPending", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "qc.listPending"] }
+          }
+        },
+        {
+          "name": "qc.specsForFormula",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/qc.specsForFormula?input={\"json\":{\"formulaId\":\"{{formulaId}}\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "qc.specsForFormula"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"formulaId\":\"{{formulaId}}\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "qc.recordResult",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"parameter\": \"pH\",\n    \"measuredValue\": 5.4,\n    \"result\": \"pass\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/qc.recordResult", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "qc.recordResult"] }
+          }
+        },
+        {
+          "name": "qc.release",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"meaningStatement\": \"Confirmo que reviso los resultados de calidad y libero este lote para su comercializacion\",\n    \"reauthVerified\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/qc.release", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "qc.release"] }
+          }
+        },
+        {
+          "name": "qc.reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"meaningStatement\": \"Confirmo que reviso los resultados de calidad y rechazo este lote: no puede comercializarse\",\n    \"reauthVerified\": true\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/qc.reject", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "qc.reject"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Desviaciones",
+      "item": [
+        {
+          "name": "deviations.list",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": { "raw": "{{baseUrl}}/api/trpc/deviations.list", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "deviations.list"] }
+          }
+        },
+        {
+          "name": "deviations.getById",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/deviations.getById?input={\"json\":{\"id\":\"{{deviationId}}\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "deviations.getById"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"id\":\"{{deviationId}}\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "deviations.create",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{productionOrderId}}\",\n    \"description\": \"Se detecto temperatura fuera de rango durante el mezclado\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/deviations.create", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "deviations.create"] }
+          }
+        },
+        {
+          "name": "deviations.startInvestigation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"json\": {\n    \"id\": \"{{deviationId}}\"\n  }\n}" },
+            "url": { "raw": "{{baseUrl}}/api/trpc/deviations.startInvestigation", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "deviations.startInvestigation"] }
+          }
+        },
+        {
+          "name": "deviations.submitInvestigation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{deviationId}}\",\n    \"investigation\": \"Se reviso el sensor de temperatura y se encontro una falla de calibracion\",\n    \"correctiveAction\": \"Se recalibro el sensor y se reforzo el protocolo de verificacion diaria\"\n  }\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/trpc/deviations.submitInvestigation", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "deviations.submitInvestigation"] }
+          }
+        },
+        {
+          "name": "deviations.approve",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Cookie", "value": "{{cookie}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"json\": {\n    \"id\": \"{{deviationId}}\"\n  }\n}" },
+            "url": { "raw": "{{baseUrl}}/api/trpc/deviations.approve", "host": ["{{baseUrl}}"], "path": ["api", "trpc", "deviations.approve"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Trazabilidad",
+      "item": [
+        {
+          "name": "traceability.byRawMaterialLot",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/traceability.byRawMaterialLot?input={\"json\":{\"rawMaterialLotCode\":\"LOTE-0001\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "traceability.byRawMaterialLot"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"rawMaterialLotCode\":\"LOTE-0001\"}}" }]
+            }
+          }
+        },
+        {
+          "name": "traceability.byFinishedLot",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/traceability.byFinishedLot?input={\"json\":{\"finishedProductLotCode\":\"OP-2026-001\"}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "traceability.byFinishedLot"],
+              "query": [{ "key": "input", "value": "{\"json\":{\"finishedProductLotCode\":\"OP-2026-001\"}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "tRPC - Auditoría",
+      "item": [
+        {
+          "name": "audit.search",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/audit.search?input={\"json\":{}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "audit.search"],
+              "query": [{ "key": "input", "value": "{\"json\":{}}" }]
+            }
+          }
+        },
+        {
+          "name": "audit.export",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Cookie", "value": "{{cookie}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/audit.export?input={\"json\":{}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "trpc", "audit.export"],
+              "query": [{ "key": "input", "value": "{\"json\":{}}" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
