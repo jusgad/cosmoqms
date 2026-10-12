@@ -2,12 +2,25 @@ import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { withTenant } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { clerkClient } from "@clerk/nextjs/server";
 import type {
   OrganizationJSON,
   OrganizationMembershipJSON,
   UserJSON,
   WebhookEvent,
 } from "@clerk/nextjs/server";
+
+// Single-company MVP (2026-10-11 decision, "Simplificar el login"): the app
+// no longer asks a new user to create or join an organization. Every signup
+// auto-joins the one existing Clerk Organization (creating it on the very
+// first signup ever). `tenant_id`/RLS stay exactly as built — there's still
+// genuinely one row in `organizations` and every query is still tenant-
+// scoped — so re-enabling multi-company later is a UI/webhook change only,
+// never a schema or security rewrite.
+const DEFAULT_ORGANIZATION_NAME = "CosmoQMS";
+// Clerk's own membership role (not our business `Role` enum, which lives in
+// `public_metadata.role` and is resolved separately by `resolveRole` below).
+const DEFAULT_CLERK_MEMBERSHIP_ROLE = "org:member";
 
 const VALID_ROLES: readonly string[] = [
   "operario",
@@ -82,16 +95,55 @@ async function upsertUserFromMembership(membership: OrganizationMembershipJSON):
 }
 
 /**
+ * Returns the one Clerk Organization every user joins, creating it the very
+ * first time any user signs up. Asking Clerk's own org list (not our DB)
+ * sidesteps the chicken-and-egg problem of needing a `tenantId` to query a
+ * tenant-scoped table before any tenant is known yet.
+ *
+ * Known race (accepted for this single-tenant MVP, not mitigated): two
+ * signups landing before either's `getOrganizationList` call resolves could
+ * each see zero organizations and each create one, yielding two orgs
+ * instead of one. Harmless for a low-traffic internal tool's first users;
+ * revisit with a lock/unique-slug constraint if that ever matters.
+ */
+async function getOrCreateDefaultOrganization(createdByUserId: string): Promise<{ id: string; name: string }> {
+  const client = await clerkClient();
+  const existing = await client.organizations.getOrganizationList({ limit: 1 });
+  if (existing.data.length > 0) {
+    return existing.data[0];
+  }
+  return client.organizations.createOrganization({
+    name: DEFAULT_ORGANIZATION_NAME,
+    createdBy: createdByUserId,
+  });
+}
+
+/**
  * `user.created` fires without organization context unless the user was
  * already invited into an org (Clerk includes `organization_memberships` on
- * the user payload in that case). Users created outside any organization
- * have no `tenantId` yet — our schema requires one, so we defer creating
- * the `User` row until `organizationMembership.created` arrives for them.
+ * the user payload in that case). Previously this app deferred creating the
+ * `User` row until the user manually created/joined an organization via
+ * Clerk's UI. Single-company MVP: instead, auto-join them to the one
+ * default organization right here — no organization UI step is ever shown
+ * to the user. The resulting `organizationMembership.created` event (Clerk
+ * fires webhooks for Backend-API-triggered changes too) upserts the `User`
+ * row via the existing handler below, so this function doesn't duplicate
+ * that write.
  */
 async function handleUserCreated(data: UserJSON): Promise<void> {
   const membership = data.organization_memberships?.[0];
-  if (!membership) return;
-  await upsertUserFromMembership(membership);
+  if (membership) {
+    await upsertUserFromMembership(membership);
+    return;
+  }
+
+  const client = await clerkClient();
+  const organization = await getOrCreateDefaultOrganization(data.id);
+  await client.organizations.createOrganizationMembership({
+    organizationId: organization.id,
+    userId: data.id,
+    role: DEFAULT_CLERK_MEMBERSHIP_ROLE,
+  });
 }
 
 async function handleMembershipUpdated(membership: OrganizationMembershipJSON): Promise<void> {
