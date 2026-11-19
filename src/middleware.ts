@@ -1,15 +1,11 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demoMode";
 
 const isPublicRoute = createRouteMatcher(["/login(.*)", "/api/webhooks/clerk", "/api/health"]);
 
-// TEMPORARY (2026-10-11, requested + approved by Sebas): see the matching
-// block in `src/lib/auth.ts` — removed together once the manual's
-// screenshots are done.
-const DEMO_MODE = process.env.DEMO_MODE === "true";
-
 export default clerkMiddleware(async (auth, req) => {
-  if (DEMO_MODE || isPublicRoute(req)) return NextResponse.next();
+  if (isDemoMode() || isPublicRoute(req)) return NextResponse.next();
   await auth.protect();
 });
 

@@ -19,27 +19,26 @@ migraciones y la base se levantan juntas con `docker compose`.
 
 ## PASO 1 — Variables de entorno
 
-Copia `.env.example` a `.env` y llena como mínimo las llaves de Clerk:
+Copia `.env.example` a `.env` y llena:
 
 ```
+POSTGRES_PASSWORD=      # openssl rand -hex 24  (dueño de las tablas)
+RUNTIME_DB_PASSWORD=    # openssl rand -hex 24  (rol de la app, sujeto a RLS)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 CLERK_WEBHOOK_SECRET=
-NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_APP_URL=https://<tu-dominio>
+APP_DOMAIN=<tu-dominio>
 ```
 
-`DATABASE_URL` y `DIRECT_URL` dentro de los contenedores las fija
-`docker-compose.yml` (apuntan al servicio `db`). En `.env` solo hacen falta
-para correr Prisma o `pnpm dev` desde tu máquina, contra el puerto publicado:
+Compose no arranca si faltan las dos contraseñas. Dentro de los contenedores
+`DATABASE_URL`/`DIRECT_URL` las arma `docker-compose.yml`; en `.env` solo
+hacen falta para correr Prisma o `pnpm dev` desde tu máquina (ver
+`.env.example`). Nunca se commitea `.env`.
 
-```
-DATABASE_URL=postgresql://cosmoqms_app:<contraseña>@localhost:5433/cosmoqms
-DIRECT_URL=postgresql://cosmoqms_app:<contraseña>@localhost:5433/cosmoqms
-```
-
-> Antes de un despliegue real, cambia la contraseña de `POSTGRES_PASSWORD` en
-> `docker-compose.yml` (y en las URLs) por una generada y guárdala fuera del
-> repo. Nunca se commitea `.env`.
+> Si la base ya existía con otra contraseña, el volumen conserva la vieja:
+> cámbiala con `docker compose exec db psql -U cosmoqms_app -d cosmoqms -c "ALTER ROLE cosmoqms_app PASSWORD '<nueva>'"`.
+> La de `cosmoqms_runtime` se aplica sola en cada arranque.
 
 ## PASO 2 — Clerk
 
@@ -54,40 +53,41 @@ DIRECT_URL=postgresql://cosmoqms_app:<contraseña>@localhost:5433/cosmoqms
 ## PASO 3 — Levantar todo
 
 ```bash
-docker compose up -d --build
+docker compose --profile https up -d --build
 ```
 
 Orden de arranque:
-1. `db` — PostgreSQL, espera a estar sano (`pg_isready`).
-2. `migrate` — corre `prisma migrate deploy` y termina.
-3. `cosmoqms` — la app en `http://localhost:3001`, con healthcheck en `/api/health`.
+1. `db` — PostgreSQL 16, publicado solo en `127.0.0.1:5433`.
+2. `migrate` — `prisma migrate deploy` como dueño de las tablas.
+3. `db-security` — crea/actualiza el rol `cosmoqms_runtime` (`db/runtime-role.sql`) y aplica RLS (`db/rls.sql`) en todas las tablas.
+4. `cosmoqms` — la app, conectada como `cosmoqms_runtime`, en el puerto 3001.
+5. `caddy` — HTTPS en 443 (y redirección desde 80) para `APP_DOMAIN`. Con un dominio real que apunte al servidor, el certificado de Let's Encrypt es automático; con `localhost` usa un certificado local.
 
-Datos de demostración (opcional, solo entornos de prueba):
+Sin `--profile https` se levanta todo menos Caddy (app en `http://localhost:3001`).
+
+## PASO 4 — Comprobar la seguridad de la base
 
 ```bash
-pnpm seed:demo
+docker compose exec db psql -U cosmoqms_app -d cosmoqms -c "select rolname, rolsuper, rolbypassrls from pg_roles where rolname like 'cosmoqms%'"
 ```
 
-## PASO 4 — Seguridad entre empresas (RLS)
+`cosmoqms_runtime` debe salir con `f | f`. Con ese rol, una consulta sin
+tenant no ve filas, no se pueden leer ni insertar filas de otra empresa, y
+`batch_events`/`audit_log`/`attachments` no aceptan `UPDATE` ni `DELETE`.
 
-`db/rls.sql` trae las políticas de Row Level Security por `tenant_id`. Para que
-apliquen de verdad, la app **no** puede conectarse con el usuario dueño de las
-tablas (`cosmoqms_app` en compose es superusuario y se salta RLS):
+## PASO 5 — Modo demo (solo capturas y Postman)
 
-1. Crear el rol de ejecución con la plantilla comentada al final de `db/rls.sql`
-   (`cosmoqms_runtime`: sin superusuario, sin BYPASSRLS, sin ser dueño).
-2. Aplicar el archivo como dueño:
-   `docker compose exec -T db psql -U cosmoqms_app -d cosmoqms < db/rls.sql`
-3. Cambiar `DATABASE_URL` del servicio `cosmoqms` al rol `cosmoqms_runtime`;
-   `DIRECT_URL` (migraciones) sigue con el dueño.
-4. Verificar: `select rolsuper, rolbypassrls from pg_roles where rolname = current_user;` → `f, f`.
+```bash
+DEMO_ROLE=admin docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+```
 
-## PASO 5 — Producción
+Abre una sesión sin Clerk con el rol indicado. Solo funciona con
+`docker-compose.demo.yml` y solo si la app corre en `localhost`
+(`src/lib/demoMode.ts`): en un dominio real se ignora aunque alguien copie
+`DEMO_MODE=true`. El `docker-compose.yml` normal lo fuerza a `false`.
 
-- Quitar `DEMO_MODE` y `DEMO_ROLE` del servicio `cosmoqms` (son solo para demo
-  y capturas; nunca en producción).
-- Poner un proxy con HTTPS delante del puerto 3001 (Caddy, Nginx o Traefik) y
-  apuntar el dominio de la empresa.
+## PASO 6 — Producción
+
 - Backups: `pg_dump` diario del contenedor `db` hacia almacenamiento externo, y
   una restauración de prueba cada trimestre (requisito BPM de integridad de datos).
 - Opcional: `SENTRY_DSN` para monitoreo de errores y `RESEND_API_KEY` para

@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { withTenant } from "@/lib/db";
 import type { Role } from "@prisma/client";
+import { isDemoMode } from "@/lib/demoMode";
 
 export type CurrentUser = { id: string; tenantId: string; role: Role };
 
@@ -16,12 +17,8 @@ export type CurrentUser = { id: string; tenantId: string; role: Role };
 // exactly the row this function would accept anyway (it already rejects any
 // user whose `tenantId !== orgId`), so behaviour is unchanged without RLS and
 // correct with it.
-// TEMPORARY (2026-10-11, requested + approved by Sebas): lets a reviewer
-// browse every screen without a Clerk session, to capture real screenshots
-// for the user manual. Gated behind `DEMO_MODE` so it is inert unless that
-// env var is explicitly set to "true" in Vercel, and reverted (this whole
-// block removed) once the manual's screenshots are done — see commit
-// message for the removal commit.
+// Demo mode (src/lib/demoMode.ts): a session without Clerk, only on a local
+// app URL and only with docker-compose.demo.yml (DEMO_MODE=true).
 // `DEMO_ROLE` picks which role the demo session plays (default
 // director_tecnico) — e.g. `admin` to exercise catalog writes from Postman.
 // An unknown value falls back to the default instead of inventing a role.
@@ -57,7 +54,7 @@ async function ensureDemoUser(): Promise<CurrentUser> {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  if (process.env.DEMO_MODE === "true") return ensureDemoUser();
+  if (isDemoMode()) return ensureDemoUser();
 
   const { userId, orgId } = await auth();
   if (!userId || !orgId) return null;

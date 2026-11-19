@@ -1,0 +1,17 @@
+# HTTPS delante de CosmoQMS (docker compose --profile https up -d).
+# APP_DOMAIN=localhost -> certificado local de Caddy.
+# APP_DOMAIN=qms.tulaboratorio.com -> certificado de Let's Encrypt automático
+# (el dominio debe apuntar a este servidor y los puertos 80/443 estar abiertos).
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy cosmoqms:3000
+}

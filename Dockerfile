@@ -45,4 +45,7 @@ ENV STORAGE_LOCAL_DIR=/app/storage
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
+# Escuchar en todas las interfaces (Docker inyecta HOSTNAME=<id del contenedor>,
+# y sin esto el healthcheck contra localhost falla).
+ENV HOSTNAME=0.0.0.0
 CMD ["node", "server.js"]

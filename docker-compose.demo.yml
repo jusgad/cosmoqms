@@ -1,0 +1,10 @@
+# SOLO DEMO / CAPTURAS / POSTMAN — nunca en producción.
+# Sesión sin Clerk con el rol DEMO_ROLE. src/lib/demoMode.ts además la
+# rechaza si la app no corre en localhost.
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+services:
+  cosmoqms:
+    environment:
+      DEMO_MODE: "true"
+      DEMO_ROLE: ${DEMO_ROLE:-director_tecnico}
+      NEXT_PUBLIC_APP_URL: http://localhost:3001

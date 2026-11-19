@@ -1,10 +1,9 @@
 -- Row Level Security policies for multi-tenancy (CosmoQMS)
 --
--- STATUS: NOT YET APPLIED to any database. The database is the self-hosted
--- PostgreSQL 16 of docker-compose.yml (no managed provider). This file is
--- written to be applied once, after `prisma migrate deploy` has created the
--- tables, and is safe to re-run (every policy is dropped-if-exists before
--- being created).
+-- STATUS: applied by the `db-security` service of docker-compose.yml after
+-- every `prisma migrate deploy` (self-hosted PostgreSQL 16), right after
+-- db/runtime-role.sql. Safe to re-run: every policy is dropped-if-exists
+-- before being created.
 --
 -- ============================================================================
 -- READ THIS BEFORE APPLYING: RLS ONLY PROTECTS A NON-BYPASS ROLE
@@ -20,8 +19,8 @@
 --
 -- Therefore, once this is applied:
 --   1. `DATABASE_URL` (runtime) MUST connect as a dedicated role that is NOT
---      a superuser, does NOT have BYPASSRLS, and does NOT own the tables — a
---      template is at the bottom of this file (commented out).
+--      a superuser, does NOT have BYPASSRLS, and does NOT own the tables —
+--      `cosmoqms_runtime`, created by db/runtime-role.sql.
 --   2. `DIRECT_URL` (migrations only) keeps using the owner role.
 --   3. Every table below also gets `FORCE ROW LEVEL SECURITY`, so that even
 --      the table owner is subject to the policies (defense in depth in case
@@ -283,23 +282,3 @@ drop policy if exists tenant_isolation_insert on attachments;
 create policy tenant_isolation_insert on attachments
   for insert
   with check (tenant_id = (select public.app_current_tenant_id()));
-
--- ============================================================================
--- TEMPLATE (commented out — run as the owner role; do NOT run blindly)
--- ============================================================================
--- A dedicated runtime role that RLS actually applies to. Put its credentials
--- in DATABASE_URL; keep DIRECT_URL on the owner role for migrations.
---
--- create role cosmoqms_runtime login password '<generate-a-strong-secret>'
---   nosuperuser nobypassrls nocreatedb nocreaterole;
--- grant usage on schema public to cosmoqms_runtime;
--- grant select, insert, update, delete on all tables in schema public to cosmoqms_runtime;
--- -- Append-only tables: no UPDATE/DELETE privilege at all (belt and braces
--- -- on top of the missing RLS policies above).
--- revoke update, delete on batch_events, audit_log from cosmoqms_runtime;
--- grant execute on function public.app_current_tenant_id() to cosmoqms_runtime;
--- alter default privileges in schema public
---   grant select, insert, update, delete on tables to cosmoqms_runtime;
---
--- Sanity check after switching DATABASE_URL (should return f, f):
--- select rolsuper, rolbypassrls from pg_roles where rolname = current_user;

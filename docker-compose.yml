@@ -1,13 +1,24 @@
+# CosmoQMS — PostgreSQL 16 + migraciones + seguridad de BD + app.
+#
+# Secretos: POSTGRES_PASSWORD y RUNTIME_DB_PASSWORD se leen del archivo .env
+# (nunca se commitea). Generarlos con:  openssl rand -hex 24
+# Modo demo (sin Clerk, solo en localhost):
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+# HTTPS con Caddy:  docker compose --profile https up -d
+
+x-owner-url: &owner-url postgresql://cosmoqms_app:${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}@db:5432/cosmoqms
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: cosmoqms_app
-      POSTGRES_PASSWORD: CosmoQMS_App_2026
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
       POSTGRES_DB: cosmoqms
     ports:
-      - "5433:5432"
+      # Solo en esta máquina: la base nunca queda expuesta a la red.
+      - "127.0.0.1:5433:5432"
     volumes:
       - cosmoqms-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -16,20 +27,44 @@ services:
       timeout: 5s
       retries: 10
 
-  # One-shot: applies pending Prisma migrations, then exits. Uses the
-  # `builder` stage of the Dockerfile, which still has the Prisma CLI (the
-  # slim runtime image does not).
+  # One-shot: applies pending Prisma migrations as the table owner, then
+  # exits. Uses the `builder` stage of the Dockerfile, which still has the
+  # Prisma CLI (the slim runtime image does not).
   migrate:
     build:
       context: .
       target: builder
     command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
     environment:
-      DATABASE_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
-      DIRECT_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
+      DATABASE_URL: *owner-url
+      DIRECT_URL: *owner-url
     depends_on:
       db:
         condition: service_healthy
+    restart: "no"
+
+  # One-shot: (re)creates the unprivileged runtime role and applies the Row
+  # Level Security policies. Runs after every migration so new tables are
+  # covered too.
+  db-security:
+    image: postgres:16-alpine
+    command:
+      - sh
+      - -c
+      - >-
+        psql -v ON_ERROR_STOP=1 -v runtime_password="$$RUNTIME_DB_PASSWORD" -f /db/runtime-role.sql &&
+        psql -v ON_ERROR_STOP=1 -f /db/rls.sql
+    environment:
+      PGHOST: db
+      PGUSER: cosmoqms_app
+      PGDATABASE: cosmoqms
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      RUNTIME_DB_PASSWORD: ${RUNTIME_DB_PASSWORD:?Falta RUNTIME_DB_PASSWORD en .env}
+    volumes:
+      - ./db:/db:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: "no"
 
   cosmoqms:
@@ -40,16 +75,18 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
-      DIRECT_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
-      DEMO_MODE: "true"
-      DEMO_ROLE: ${DEMO_ROLE:-director_tecnico}
+      # The app connects as cosmoqms_runtime: RLS applies to it (CLAUDE.md
+      # rule 4). The owner role is only for migrations.
+      DATABASE_URL: postgresql://cosmoqms_runtime:${RUNTIME_DB_PASSWORD:?Falta RUNTIME_DB_PASSWORD en .env}@db:5432/cosmoqms
+      DIRECT_URL: postgresql://cosmoqms_runtime:${RUNTIME_DB_PASSWORD:?Falta RUNTIME_DB_PASSWORD en .env}@db:5432/cosmoqms
+      # Never inherit demo mode from .env; only docker-compose.demo.yml sets it.
+      DEMO_MODE: "false"
       TZ: America/Bogota
       STORAGE_DRIVER: local
     volumes:
       - cosmoqms-storage:/app/storage
     depends_on:
-      migrate:
+      db-security:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -62,6 +99,28 @@ services:
       retries: 5
       start_period: 20s
 
+  # Optional HTTPS reverse proxy. With APP_DOMAIN=localhost (default) Caddy
+  # uses its own local certificate; with a real domain pointed at this
+  # server it obtains a Let's Encrypt certificate automatically.
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-80}:80"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      cosmoqms:
+        condition: service_healthy
+
 volumes:
   cosmoqms-db-data:
   cosmoqms-storage:
+  caddy-data:
+  caddy-config:

@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { isDemoMode } from "@/lib/demoMode";
 
 /**
  * Server Component: org name is passed in as a prop, resolved once in
@@ -9,11 +10,8 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
  * Clerk client component internally, but it can be rendered from a Server
  * Component parent without making this file `"use client"`.
  */
-// TEMPORARY (2026-10-11, requested + approved by Sebas): `<UserButton />`
-// needs a real Clerk session, which demo mode doesn't have — swap it for a
-// plain label so the header renders instead of erroring. Removed together
-// with the other demo-mode blocks once the manual's screenshots are done.
-const DEMO_MODE = process.env.DEMO_MODE === "true";
+// Demo mode (see src/lib/demoMode.ts) has no Clerk session, so
+// `<UserButton />` is swapped for a plain label.
 
 export function Header({ orgName, unreadNotifications }: { orgName: string; unreadNotifications: number }) {
   return (
@@ -24,7 +22,7 @@ export function Header({ orgName, unreadNotifications }: { orgName: string; unre
       <div className="flex items-center gap-3">
         <OfflineIndicator />
         <NotificationBell unread={unreadNotifications} />
-        {DEMO_MODE ? (
+        {isDemoMode() ? (
           <span className="text-sm text-muted-foreground">Usuario Demo</span>
         ) : (
           <UserButton />

@@ -2,7 +2,7 @@
   "info": {
     "name": "CosmoQMS — CRUD Materias Primas (API REST v1)",
     "_postman_id": "6f0c1d2e-6a51-4a4f-9a8e-cosmoqms-crud",
-    "description": "Pruebas del CRUD de materias primas de CosmoQMS: insertar (POST), consultar (GET), modificar (PATCH) y eliminar (DELETE), más los casos de error (validación 400, conflicto 409, no encontrado 404).\n\nRequisitos: stack de Docker arriba (`docker compose up -d`) con DEMO_MODE=true y DEMO_ROLE=admin, y el entorno 'CosmoQMS local' seleccionado. Ejecutar en orden (Run collection): cada petición guarda los datos que necesita la siguiente.",
+    "description": "Pruebas del CRUD de materias primas de CosmoQMS: insertar (POST), consultar (GET), modificar (PATCH) y eliminar (DELETE), más los casos de error (validación 400, conflicto 409, no encontrado 404).\n\nRequisitos: stack de Docker arriba en modo demo con rol admin (`DEMO_ROLE=admin docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d`), y el entorno 'CosmoQMS local' seleccionado. Ejecutar en orden (Run collection): cada petición guarda los datos que necesita la siguiente.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
