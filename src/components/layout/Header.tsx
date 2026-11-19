@@ -1,5 +1,6 @@
 import { UserButton } from "@clerk/nextjs";
 import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 /**
  * Server Component: org name is passed in as a prop, resolved once in
@@ -14,7 +15,7 @@ import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
 // with the other demo-mode blocks once the manual's screenshots are done.
 const DEMO_MODE = process.env.DEMO_MODE === "true";
 
-export function Header({ orgName }: { orgName: string }) {
+export function Header({ orgName, unreadNotifications }: { orgName: string; unreadNotifications: number }) {
   return (
     <header className="flex h-16 min-h-16 items-center justify-between gap-4 border-b border-border bg-card px-4">
       <span className="truncate font-sans text-base font-semibold text-foreground">
@@ -22,6 +23,7 @@ export function Header({ orgName }: { orgName: string }) {
       </span>
       <div className="flex items-center gap-3">
         <OfflineIndicator />
+        <NotificationBell unread={unreadNotifications} />
         {DEMO_MODE ? (
           <span className="text-sm text-muted-foreground">Usuario Demo</span>
         ) : (

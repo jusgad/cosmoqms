@@ -7,6 +7,8 @@ import {
   approveDeviationInput,
 } from "@/lib/validation/deviations";
 import { z } from "zod";
+import { notifyAudience } from "@/lib/notifications/notify";
+import { deliverEmails } from "@/lib/notifications/deliver";
 
 // Design investigation (task-13-brief.md's own header flags this as a real
 // gap to resolve, not a rubber-stamp of the brief's literal code):
@@ -75,18 +77,31 @@ export const deviationsRouter = router({
   // (where it would also block that tenant's release).
   create: roleProcedure("calidad", "jefe_planta", "operario")
     .input(createDeviationInput)
-    .mutation(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
+    .mutation(async ({ ctx, input }) => {
+      const { deviation, emails } = await tenantTx(ctx, async (tx) => {
         const order = await tx.productionOrder.findFirst({
           where: { id: input.productionOrderId, tenantId: ctx.user.tenantId },
-          select: { id: true },
+          select: { id: true, orderNumber: true },
         });
         if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Orden de producción no encontrada" });
-        return tx.deviation.create({
+        const created = await tx.deviation.create({
           data: { tenantId: ctx.user.tenantId, ...input, raisedBy: ctx.user.id, status: "abierta" },
         });
-      }),
-    ),
+        const pending = await notifyAudience(tx, {
+          tenantId: ctx.user.tenantId,
+          actorUserId: ctx.user.id,
+          draft: {
+            kind: "desviacion_creada",
+            title: `Nueva desviación en ${order.orderNumber}`,
+            body: input.description,
+            link: `/calidad/desviaciones/${created.id}`,
+          },
+        });
+        return { deviation: created, emails: pending };
+      });
+      await deliverEmails(emails, ctx.user.id);
+      return deviation;
+    }),
 
   // Step 1 of 2 (task 13 review round 1, Sebas's decision): marks who/when
   // the investigation actually started — `abierta -> en_investigacion` only,
@@ -124,10 +139,11 @@ export const deviationsRouter = router({
   // `approve` below.
   submitInvestigation: roleProcedure("calidad")
     .input(submitInvestigationInput)
-    .mutation(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
+    .mutation(async ({ ctx, input }) => {
+      const { deviation, emails } = await tenantTx(ctx, async (tx) => {
+        const tenantId = ctx.user.tenantId;
         const { count } = await tx.deviation.updateMany({
-          where: { id: input.id, tenantId: ctx.user.tenantId, status: "en_investigacion" },
+          where: { id: input.id, tenantId, status: "en_investigacion" },
           data: {
             investigation: input.investigation,
             correctiveAction: input.correctiveAction,
@@ -140,9 +156,26 @@ export const deviationsRouter = router({
             message: "La desviación no está en estado 'en_investigacion' — inicie la investigación primero",
           });
         }
-        return tx.deviation.findFirstOrThrow({ where: { id: input.id, tenantId: ctx.user.tenantId } });
-      }),
-    ),
+        const updated = await tx.deviation.findFirstOrThrow({ where: { id: input.id, tenantId } });
+        const order = await tx.productionOrder.findFirst({
+          where: { id: updated.productionOrderId, tenantId },
+          select: { orderNumber: true },
+        });
+        const pending = await notifyAudience(tx, {
+          tenantId,
+          actorUserId: ctx.user.id,
+          draft: {
+            kind: "desviacion_pendiente_aprobacion",
+            title: `Desviación lista para aprobar${order ? ` (${order.orderNumber})` : ""}`,
+            body: `Acción correctiva propuesta: ${input.correctiveAction}`,
+            link: `/calidad/desviaciones/${updated.id}`,
+          },
+        });
+        return { deviation: updated, emails: pending };
+      });
+      await deliverEmails(emails, ctx.user.id);
+      return deviation;
+    }),
 
   // Non-negotiable (task brief + global constraints): approval of a
   // deviation's CAPA is server-gated to `director_tecnico` via `roleProcedure`

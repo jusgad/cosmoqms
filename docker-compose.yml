@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cosmoqms_app
+      POSTGRES_PASSWORD: CosmoQMS_App_2026
+      POSTGRES_DB: cosmoqms
+    ports:
+      - "5433:5432"
+    volumes:
+      - cosmoqms-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cosmoqms_app -d cosmoqms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: applies pending Prisma migrations, then exits. Uses the
+  # `builder` stage of the Dockerfile, which still has the Prisma CLI (the
+  # slim runtime image does not).
+  migrate:
+    build:
+      context: .
+      target: builder
+    command: ["pnpm", "exec", "prisma", "migrate", "deploy"]
+    environment:
+      DATABASE_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
+      DIRECT_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  cosmoqms:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
+      DIRECT_URL: postgresql://cosmoqms_app:CosmoQMS_App_2026@db:5432/cosmoqms
+      DEMO_MODE: "true"
+      DEMO_ROLE: ${DEMO_ROLE:-director_tecnico}
+      TZ: America/Bogota
+      STORAGE_DRIVER: local
+    volumes:
+      - cosmoqms-storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  cosmoqms-db-data:
+  cosmoqms-storage:

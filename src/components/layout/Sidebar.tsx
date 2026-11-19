@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Users,
   Settings,
+  FileBarChart,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ type NavItem = {
  *   (puntos criticos), director_tecnico (libera lote). NUNCA admin ni bodega.
  * - Calidad: calidad + director_tecnico unicamente (registrar QC, desviaciones).
  * - Trazabilidad: calidad + director_tecnico (ven trazabilidad completa).
+ * - Reportes: calidad + director_tecnico (reporte BPM para INVIMA).
  * - SOPs: todos los roles de planta (operario, jefe_planta, calidad,
  *   director_tecnico, bodega) — acuse de SOP no esta restringido por rol en
  *   el blueprint. Admin no opera en planta, se excluye.
@@ -84,6 +86,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/trazabilidad",
     label: "Trazabilidad",
     icon: Route,
+    roles: ["calidad", "director_tecnico"],
+  },
+  {
+    href: "/reportes",
+    label: "Reportes",
+    icon: FileBarChart,
     roles: ["calidad", "director_tecnico"],
   },
   {

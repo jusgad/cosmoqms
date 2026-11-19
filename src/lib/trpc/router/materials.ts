@@ -2,7 +2,13 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
-import { receiveLotInput } from "@/lib/validation/materials";
+import { rawMaterialInput, rawMaterialUpdateInput, receiveLotInput } from "@/lib/validation/materials";
+import {
+  createRawMaterial,
+  deleteRawMaterial,
+  getRawMaterial,
+  updateRawMaterial,
+} from "@/lib/materials/catalog";
 
 // Tenant isolation (final review, Critical 2): every query filters by
 // `tenantId` explicitly (defense in depth while RLS is not applied to any
@@ -17,18 +23,18 @@ export const materialsRouter = router({
   ),
   getById: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin")
     .input(z.object({ id: z.string().uuid() }))
-    .query(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
-        const material = await tx.rawMaterial.findFirst({ where: { id: input.id, tenantId: ctx.user.tenantId } });
-        if (!material) throw new TRPCError({ code: "NOT_FOUND", message: "Materia prima no encontrada" });
-        return material;
-      }),
-    ),
+    .query(({ ctx, input }) => tenantTx(ctx, (tx) => getRawMaterial(tx, ctx.user.tenantId, input.id))),
   create: roleProcedure("bodega", "admin")
-    .input(z.object({ code: z.string(), name: z.string(), unit: z.string(), category: z.string().optional() }))
+    .input(rawMaterialInput)
+    .mutation(({ ctx, input }) => tenantTx(ctx, (tx) => createRawMaterial(tx, ctx.user.tenantId, input))),
+  update: roleProcedure("bodega", "admin")
+    .input(z.object({ id: z.string().uuid(), data: rawMaterialUpdateInput }))
     .mutation(({ ctx, input }) =>
-      tenantTx(ctx, (tx) => tx.rawMaterial.create({ data: { ...input, tenantId: ctx.user.tenantId } })),
+      tenantTx(ctx, (tx) => updateRawMaterial(tx, ctx.user.tenantId, input.id, input.data)),
     ),
+  delete: roleProcedure("bodega", "admin")
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(({ ctx, input }) => tenantTx(ctx, (tx) => deleteRawMaterial(tx, ctx.user.tenantId, input.id))),
   // The client-supplied `rawMaterialId` is verified to belong to the
   // caller's tenant before a lot is received against it (final review,
   // Critical 2 — no cross-tenant foreign keys).

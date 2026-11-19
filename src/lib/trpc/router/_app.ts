@@ -6,6 +6,7 @@ import { qcRouter } from "@/lib/trpc/router/qc";
 import { deviationsRouter } from "@/lib/trpc/router/deviations";
 import { traceabilityRouter } from "@/lib/trpc/router/traceability";
 import { auditRouter } from "@/lib/trpc/router/audit";
+import { notificationsRouter } from "@/lib/trpc/router/notifications";
 
 export const appRouter = router({
   materials: materialsRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   deviations: deviationsRouter,
   traceability: traceabilityRouter,
   audit: auditRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

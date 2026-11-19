@@ -76,7 +76,8 @@
 -- ============================================================================
 -- Direct tenant_id column: users, raw_materials, raw_material_lots,
 -- master_formulas, production_orders, batch_events, qc_specifications,
--- qc_results, deviations, finished_product_lots, sops, audit_log.
+-- qc_results, deviations, finished_product_lots, sops, audit_log,
+-- notifications, attachments.
 -- Tenant row itself: organizations (its `id` IS the tenant id).
 -- No tenant_id column — isolated through the parent row: formula_ingredients
 -- (-> master_formulas), batch_signatures (-> production_orders),
@@ -262,6 +263,26 @@ create policy tenant_isolation on sop_acknowledgments
       where tenant_id = (select public.app_current_tenant_id())
     )
   );
+
+-- notifications (per-recipient inbox; read state is the only thing updated)
+alter table notifications enable row level security;
+alter table notifications force row level security;
+drop policy if exists tenant_isolation on notifications;
+create policy tenant_isolation on notifications
+  using (tenant_id = (select public.app_current_tenant_id()))
+  with check (tenant_id = (select public.app_current_tenant_id()));
+
+-- attachments (files are never deleted or replaced: SELECT + INSERT only)
+alter table attachments enable row level security;
+alter table attachments force row level security;
+drop policy if exists tenant_isolation_select on attachments;
+create policy tenant_isolation_select on attachments
+  for select
+  using (tenant_id = (select public.app_current_tenant_id()));
+drop policy if exists tenant_isolation_insert on attachments;
+create policy tenant_isolation_insert on attachments
+  for insert
+  with check (tenant_id = (select public.app_current_tenant_id()));
 
 -- ============================================================================
 -- TEMPLATE (commented out — requires live Supabase access; do NOT run blindly)

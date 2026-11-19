@@ -3,6 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { LotStatusBadge } from "@/components/materials/LotStatusBadge";
 import { LotStatusAction } from "@/components/materials/LotStatusAction";
+import { AttachmentList } from "@/components/attachments/AttachmentList";
+import { AttachmentUploader } from "@/components/attachments/AttachmentUploader";
+import { listAttachments } from "@/lib/attachments/service";
+import { UPLOAD_ROLES } from "@/lib/validation/attachments";
 
 export default async function LotDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,15 +15,22 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
     redirect("/login");
   }
 
-  const lot = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.rawMaterialLot.findFirst({ where: { id, tenantId: user.tenantId }, include: { rawMaterial: true } }),
-  );
+  const result = await withTenant(user.tenantId, user.id, async (tx) => {
+    const found = await tx.rawMaterialLot.findFirst({
+      where: { id, tenantId: user.tenantId },
+      include: { rawMaterial: true },
+    });
+    if (!found) return null;
+    return { lot: found, attachments: await listAttachments(tx, user.tenantId, "raw_material_lot", found.id) };
+  });
 
-  if (!lot) {
+  if (!result) {
     notFound();
   }
+  const { lot, attachments } = result;
 
   const canChangeStatus = user.role === "bodega" || user.role === "calidad";
+  const canUpload = UPLOAD_ROLES.raw_material_lot.includes(user.role);
 
   const fields: { label: string; value: string }[] = [
     { label: "Materia prima", value: `${lot.rawMaterial.code} — ${lot.rawMaterial.name}` },
@@ -30,7 +41,7 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
     { label: "Cantidad disponible", value: `${lot.quantityAvailable} ${lot.rawMaterial.unit}` },
     { label: "Fecha de recepción", value: lot.receivedAt.toLocaleDateString("es-CO") },
     { label: "Fecha de vencimiento", value: lot.expiryDate.toLocaleDateString("es-CO") },
-    { label: "Certificado de análisis (COA)", value: lot.coaDocumentUrl ?? "No suministrado" },
+    { label: "Enlace externo del COA", value: lot.coaDocumentUrl ?? "No suministrado" },
   ];
 
   return (
@@ -50,6 +61,16 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
       </dl>
 
       {canChangeStatus && <LotStatusAction lotId={lot.id} status={lot.status} />}
+
+      <section aria-labelledby="coa-title" className="flex flex-col gap-3">
+        <h2 id="coa-title" className="font-sans text-lg font-semibold text-foreground">
+          Certificados de análisis (COA)
+        </h2>
+        <AttachmentList items={attachments} emptyText="Este lote aún no tiene certificados adjuntos." />
+        {canUpload && (
+          <AttachmentUploader entityType="raw_material_lot" entityId={lot.id} label="Adjuntar certificado de análisis" />
+        )}
+      </section>
     </div>
   );
 }

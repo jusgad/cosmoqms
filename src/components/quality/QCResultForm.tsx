@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { recordResultInput } from "@/lib/validation/qc";
+import { evaluateAgainstSpec, normalizeParameter } from "@/lib/quality/evaluateSpec";
 
 const inputClasses =
   "h-11 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -44,21 +45,19 @@ export function QCResultForm({
   // (via the datalist suggestions below), so "pH" and "ph" both resolve to
   // the same `QcSpecification` row.
   const matchingSpec = useMemo(
-    () => specsQuery.data?.find((spec) => spec.parameter.toLowerCase() === parameter.trim().toLowerCase()),
+    () => specsQuery.data?.find((spec) => normalizeParameter(spec.parameter) === normalizeParameter(parameter)),
     [specsQuery.data, parameter],
   );
 
-  // Auto-derives pass/fail by comparing the measured value against the
-  // matched spec's min/max (Step 6 of task-12-brief.md). No spec match, or no
-  // numeric value yet, means no verdict can be derived — the form disables
+  // Preview of the verdict the server will compute and persist
+  // (`qc.recordResult` re-evaluates against the same spec). No spec match, or
+  // no numeric value yet, means no verdict can be derived — the form disables
   // submission in that case rather than guessing or defaulting to "pass".
   const derivedResult = useMemo<"pass" | "fail" | null>(() => {
     if (!matchingSpec || measuredValue.trim() === "") return null;
     const value = Number(measuredValue);
     if (Number.isNaN(value)) return null;
-    const belowMin = matchingSpec.minValue !== null && value < matchingSpec.minValue;
-    const aboveMax = matchingSpec.maxValue !== null && value > matchingSpec.maxValue;
-    return belowMin || aboveMax ? "fail" : "pass";
+    return evaluateAgainstSpec(value, matchingSpec);
   }, [matchingSpec, measuredValue]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

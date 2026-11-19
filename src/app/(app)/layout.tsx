@@ -10,15 +10,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  const organization = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.organization.findUnique({ where: { id: user.tenantId }, select: { name: true } }),
+  const [organization, unreadNotifications] = await withTenant(user.tenantId, user.id, (tx) =>
+    Promise.all([
+      tx.organization.findUnique({ where: { id: user.tenantId }, select: { name: true } }),
+      tx.notification.count({ where: { tenantId: user.tenantId, recipientUserId: user.id, readAt: null } }),
+    ]),
   );
 
   return (
     <div className="flex min-h-screen flex-col md:grid md:grid-cols-[240px_1fr]">
       <Sidebar role={user.role} />
       <div className="flex min-h-screen flex-1 flex-col">
-        <Header orgName={organization?.name ?? "CosmoQMS"} />
+        <Header orgName={organization?.name ?? "CosmoQMS"} unreadNotifications={unreadNotifications} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
     </div>

@@ -22,9 +22,17 @@ export type CurrentUser = { id: string; tenantId: string; role: Role };
 // env var is explicitly set to "true" in Vercel, and reverted (this whole
 // block removed) once the manual's screenshots are done — see commit
 // message for the removal commit.
-const DEMO_USER: CurrentUser = { id: "demo-user", tenantId: "demo-org", role: "director_tecnico" };
+// `DEMO_ROLE` picks which role the demo session plays (default
+// director_tecnico) — e.g. `admin` to exercise catalog writes from Postman.
+// An unknown value falls back to the default instead of inventing a role.
+const DEMO_ROLES: readonly Role[] = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
+function demoRole(): Role {
+  const requested = process.env.DEMO_ROLE;
+  return DEMO_ROLES.find((role) => role === requested) ?? "director_tecnico";
+}
 
 async function ensureDemoUser(): Promise<CurrentUser> {
+  const DEMO_USER: CurrentUser = { id: "demo-user", tenantId: "demo-org", role: demoRole() };
   await withTenant(DEMO_USER.tenantId, DEMO_USER.id, (tx) =>
     tx.organization.upsert({
       where: { id: DEMO_USER.tenantId },
@@ -42,7 +50,7 @@ async function ensureDemoUser(): Promise<CurrentUser> {
         email: "demo@cosmoqms.local",
         role: DEMO_USER.role,
       },
-      update: {},
+      update: { role: DEMO_USER.role },
     }),
   );
   return DEMO_USER;

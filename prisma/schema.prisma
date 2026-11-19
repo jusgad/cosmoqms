@@ -26,6 +26,8 @@ model Organization {
   finishedProductLots FinishedProductLot[]
   sops                Sop[]
   auditLogs           AuditLog[]
+  notifications       Notification[]
+  attachments         Attachment[]
 
   @@map("organizations")
 }
@@ -45,9 +47,10 @@ model User {
   fullName   String       @map("full_name")
   email      String
   role       Role
-  mfaEnabled Boolean      @default(false) @map("mfa_enabled")
-  active     Boolean      @default(true)
-  tenant     Organization @relation(fields: [tenantId], references: [id])
+  mfaEnabled    Boolean        @default(false) @map("mfa_enabled")
+  active        Boolean        @default(true)
+  tenant        Organization   @relation(fields: [tenantId], references: [id])
+  notifications Notification[]
 
   @@index([tenantId])
   @@map("users")
@@ -346,4 +349,63 @@ model AuditLog {
 
   @@index([tenantId, tableName])
   @@map("audit_log")
+}
+
+enum NotificationKind {
+  desviacion_creada
+  desviacion_pendiente_aprobacion
+  qc_fuera_de_especificacion
+}
+
+// One row per recipient (fan-out at write time) so each person's read state
+// is independent. Rows are written inside the same `withTenant` transaction as
+// the event that triggers them, so a notification never exists for a
+// deviation/QC result that rolled back.
+model Notification {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  recipientUserId String           @map("recipient_user_id")
+  kind            NotificationKind
+  title           String
+  body            String
+  link            String?
+  createdAt       DateTime         @default(now()) @map("created_at")
+  readAt          DateTime?        @map("read_at")
+  emailedAt       DateTime?        @map("emailed_at")
+  tenant          Organization     @relation(fields: [tenantId], references: [id])
+  recipient       User             @relation(fields: [recipientUserId], references: [id])
+
+  @@index([tenantId, recipientUserId, readAt])
+  @@map("notifications")
+}
+
+enum AttachmentEntity {
+  raw_material_lot
+  production_order
+}
+
+enum AttachmentKind {
+  coa
+  evidencia
+}
+
+// Files are never deleted or replaced (BPM record integrity): a correction is
+// a new upload. `storageKey` is the driver-relative path (local disk or a
+// Supabase Storage object key) and always starts with the tenant id.
+model Attachment {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  entityType AttachmentEntity @map("entity_type")
+  entityId   String           @map("entity_id")
+  kind       AttachmentKind
+  fileName   String           @map("file_name")
+  mimeType   String           @map("mime_type")
+  sizeBytes  Int              @map("size_bytes")
+  storageKey String           @unique @map("storage_key")
+  uploadedBy String           @map("uploaded_by")
+  uploadedAt DateTime         @default(now()) @map("uploaded_at")
+  tenant     Organization     @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@map("attachments")
 }

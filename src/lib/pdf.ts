@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { escapeHtml } from "@/lib/html";
 
 // Display-shape types for the batch record. Deliberately plain (not a raw
 // Prisma `GetPayload`): the PDF route converts `Decimal`/`Date` fields to
@@ -33,25 +34,12 @@ export interface BatchRecordOrder {
   events: BatchRecordEvent[];
 }
 
-// Final-review fix (Important 9): every interpolated value is HTML-escaped.
-// `meaningStatement`, QC `parameter` and the other free-text fields are
-// user-controlled (any user with signing/QC rights sets them), and this HTML
-// becomes a legal batch-record PDF rendered by server-side Chromium — an
-// unescaped `<` could rewrite the document's visible content or inject a
-// `<script>`/`<img src=...>` that runs in (or makes requests from) the
-// renderer. Escaping `& < > " '` covers both element and attribute contexts.
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-export function escapeHtml(value: string | number): string {
-  return String(value).replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
-}
-
+// Final-review fix (Important 9): every interpolated value is HTML-escaped
+// (`escapeHtml`). `meaningStatement`, QC `parameter` and the other free-text
+// fields are user-controlled, and this HTML becomes a legal batch-record PDF
+// rendered by server-side Chromium — an unescaped `<` could rewrite the
+// document's visible content or inject markup into the renderer.
+//
 // Minimal inline styling only — this HTML is rendered to PDF via headless
 // Chromium (`renderPdf`), never shown in a browser, so it doesn't need to
 // follow the app's Tailwind/shadcn design system (no touch targets, no
@@ -81,13 +69,16 @@ export function renderBatchRecordHtml(order: BatchRecordOrder): string {
 // field were interpolated without escaping, injected script could never
 // execute in the renderer. The document is static markup — nothing in it
 // needs JavaScript.
-export async function renderPdf(html: string): Promise<Buffer> {
+export async function renderPdf(
+  html: string,
+  options: { landscape?: boolean; margin?: { top: string; bottom: string; left: string; right: string } } = {},
+): Promise<Buffer> {
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
     await page.setContent(html);
-    return await page.pdf({ format: "A4" });
+    return await page.pdf({ format: "A4", landscape: options.landscape ?? false, margin: options.margin });
   } finally {
     await browser.close();
   }

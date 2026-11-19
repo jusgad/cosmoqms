@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/login(.*)", "/api/webhooks/clerk"]);
+const isPublicRoute = createRouteMatcher(["/login(.*)", "/api/webhooks/clerk", "/api/health"]);
 
 // TEMPORARY (2026-10-11, requested + approved by Sebas): see the matching
 // block in `src/lib/auth.ts` — removed together once the manual's

@@ -14,8 +14,29 @@ type MockOrder = { id: string; orderNumber: string; formulaId: string; status: s
 // order/QC/spec/deviation state the guards read.
 let order: MockOrder | null;
 let qcResults: { parameter: string; result: string }[];
-let specs: { parameter: string }[];
+type MockSpec = { parameter: string; minValue: number | null; maxValue: number | null; unit: string | null };
+let specs: MockSpec[];
 let deviations: { status: string }[];
+
+const spec = (parameter: string, minValue: number | null = null, maxValue: number | null = null): MockSpec => ({
+  parameter,
+  minValue,
+  maxValue,
+  unit: null,
+});
+
+type UserFindManyArgs = Prisma.UserFindManyArgs;
+type NotificationCreateArgs = Prisma.NotificationCreateManyAndReturnArgs;
+const userFindMany = vi.fn(async (args: UserFindManyArgs) => {
+  void args;
+  return [{ id: "u-jefe", email: "jefe@lab.co" }];
+});
+const notificationCreateManyAndReturn = vi.fn(async (args: NotificationCreateArgs) => {
+  const rows = Array.isArray(args.data) ? args.data : [args.data];
+  return rows.map((row, index) => ({ id: `n${index}`, recipientUserId: row.recipientUserId }));
+});
+const deliverEmails = vi.hoisted(() => vi.fn(async (emails: unknown[], actorUserId: string) => void [emails, actorUserId]));
+vi.mock("@/lib/notifications/deliver", () => ({ deliverEmails }));
 
 const qcResultCreate = vi.fn(async (args: QcResultCreateArgs) => ({ id: "qc1", ...args.data }));
 const qcResultFindMany = vi.fn(async () => qcResults);
@@ -37,6 +58,8 @@ vi.mock("@/lib/db", () => ({
       batchEvent: { create: batchEventCreate },
       finishedProductLot: { create: finishedProductLotCreate },
       productionOrder: { findFirst, updateMany },
+      user: { findMany: userFindMany },
+      notification: { createManyAndReturn: notificationCreateManyAndReturn },
     }),
 }));
 
@@ -94,6 +117,64 @@ describe("qc.recordResult", () => {
     expect(await codeOf(caller("calidad").recordResult(input))).toBe("NOT_FOUND");
     expect(qcResultCreate).not.toHaveBeenCalled();
   });
+
+  // CLAUDE.md rule 7: the persisted verdict is the server's, not the client's.
+  it("persists 'pass' when the value is inside the spec even if the client sent 'fail'", async () => {
+    specs = [spec("pH", 5.5, 7)];
+    const result = await caller("calidad").recordResult({ ...input, parameter: " PH ", measuredValue: 6.2, result: "fail" });
+    expect(result.result).toBe("pass");
+    expect(notificationCreateManyAndReturn).not.toHaveBeenCalled();
+  });
+
+  it("persists 'fail' when the value is outside the spec even if the client sent 'pass'", async () => {
+    specs = [spec("pH", 5.5, 7)];
+    const result = await caller("calidad").recordResult({ ...input, measuredValue: 8.9, result: "pass" });
+    expect(result.result).toBe("fail");
+  });
+
+  it("treats the spec bounds as inclusive", async () => {
+    specs = [spec("pH", 5.5, 7)];
+    const result = await caller("calidad").recordResult({ ...input, measuredValue: 7, result: "fail" });
+    expect(result.result).toBe("pass");
+  });
+
+  it("keeps the submitted verdict only when the parameter has no specification", async () => {
+    specs = [spec("viscosidad", 1000, 2000)];
+    const result = await caller("calidad").recordResult({ ...input, parameter: "color", result: "fail" });
+    expect(result.result).toBe("fail");
+  });
+
+  it("notifies calidad, director_tecnico and jefe_planta on an out-of-spec result", async () => {
+    specs = [spec("pH", 5.5, 7)];
+    await caller("calidad").recordResult({ ...input, measuredValue: 8.9, result: "pass" });
+    expect(userFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          role: { in: ["calidad", "director_tecnico", "jefe_planta"] },
+          id: { not: "u1" },
+        }),
+      }),
+    );
+    expect(notificationCreateManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            kind: "qc_fuera_de_especificacion",
+            title: "QC fuera de especificación en OP-2026-001",
+            link: `/produccion/${ORDER_ID}`,
+          }),
+        ],
+      }),
+    );
+    expect(deliverEmails).toHaveBeenCalledWith([expect.objectContaining({ to: "jefe@lab.co" })], "u1");
+  });
+
+  it("sends no notification for a conforming result", async () => {
+    specs = [spec("pH", 5.5, 7)];
+    await caller("calidad").recordResult({ ...input, measuredValue: 6, result: "pass" });
+    expect(notificationCreateManyAndReturn).not.toHaveBeenCalled();
+    expect(deliverEmails).toHaveBeenCalledWith([], "u1");
+  });
 });
 
 const decisionInput = {
@@ -128,7 +209,7 @@ describe("qc.release", () => {
   });
 
   it("blocks release when a specified QC parameter has no result", async () => {
-    specs = [{ parameter: "pH" }, { parameter: "Viscosidad" }];
+    specs = [spec("pH"), spec("Viscosidad")];
     const error = await caller("director_tecnico")
       .release(decisionInput)
       .catch((e: unknown) => e);
@@ -138,7 +219,7 @@ describe("qc.release", () => {
   });
 
   it("matches specified parameters case/whitespace-insensitively", async () => {
-    specs = [{ parameter: " PH " }];
+    specs = [spec(" PH ")];
     await caller("director_tecnico").release(decisionInput);
     expect(updateMany).toHaveBeenCalled();
   });
@@ -163,7 +244,7 @@ describe("qc.release", () => {
   });
 
   it("advances the order, signs, and creates a FinishedProductLot when QC is clean", async () => {
-    specs = [{ parameter: "pH" }];
+    specs = [spec("pH")];
     const result = await caller("director_tecnico").release(decisionInput);
 
     expect(updateMany).toHaveBeenCalledWith({

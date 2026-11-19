@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { escapeHtml, renderBatchRecordHtml, type BatchRecordOrder } from "../pdf";
+import { renderBatchRecordHtml, type BatchRecordOrder } from "../pdf";
+import { escapeHtml } from "../html";
 
 // Zero-`any` precedent (Tasks 6-17): the brief's literal test cast its fixture
 // `as any`. `BatchRecordOrder` is `renderBatchRecordHtml`'s real, exported

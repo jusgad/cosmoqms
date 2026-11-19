@@ -5,6 +5,9 @@ import { auth } from "@clerk/nextjs/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { advanceStageInternal } from "@/lib/production/advanceStage";
 import { recordResultInput, rejectInput, releaseInput } from "@/lib/validation/qc";
+import { evaluateAgainstSpec, normalizeParameter } from "@/lib/quality/evaluateSpec";
+import { notifyAudience } from "@/lib/notifications/notify";
+import { deliverEmails } from "@/lib/notifications/deliver";
 
 // Clerk step-up check shared by `release` and `reject` — the client-sent
 // `reauthVerified: true` alone is never trusted (same pattern as
@@ -84,12 +87,18 @@ export const qcRouter = router({
   // never trusted as-is) AND be in `calidad` — QC results recorded against a
   // batch still in production, or one already released/rejected, would
   // corrupt the batch record the release decision is based on.
+  //
+  // The verdict is the server's: when the formula has a specification for
+  // this parameter, `result` is recomputed from it and the client's value is
+  // ignored (CLAUDE.md rule 7). Only a parameter with no specification at all
+  // keeps the submitted verdict. A `fail` notifies quality and the plant.
   recordResult: roleProcedure("calidad")
     .input(recordResultInput)
-    .mutation(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
+    .mutation(async ({ ctx, input }) => {
+      const { qcResult, emails } = await tenantTx(ctx, async (tx) => {
+        const tenantId = ctx.user.tenantId;
         const order = await tx.productionOrder.findFirst({
-          where: { id: input.productionOrderId, tenantId: ctx.user.tenantId },
+          where: { id: input.productionOrderId, tenantId },
         });
         if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Orden de producción no encontrada" });
         if (order.status !== "calidad") {
@@ -98,11 +107,40 @@ export const qcRouter = router({
             message: `La orden está en '${order.status}' — solo se registran resultados de QC en 'calidad'`,
           });
         }
-        return tx.qcResult.create({
-          data: { tenantId: ctx.user.tenantId, ...input, recordedBy: ctx.user.id },
+
+        const specs = await tx.qcSpecification.findMany({ where: { tenantId, formulaId: order.formulaId } });
+        const spec = specs.find((item) => normalizeParameter(item.parameter) === normalizeParameter(input.parameter));
+        const result = spec
+          ? evaluateAgainstSpec(input.measuredValue, {
+              minValue: spec.minValue === null ? null : Number(spec.minValue),
+              maxValue: spec.maxValue === null ? null : Number(spec.maxValue),
+            })
+          : input.result;
+
+        const created = await tx.qcResult.create({
+          data: { tenantId, ...input, result, recordedBy: ctx.user.id },
         });
-      }),
-    ),
+
+        const pending =
+          result === "fail"
+            ? await notifyAudience(tx, {
+                tenantId,
+                actorUserId: ctx.user.id,
+                draft: {
+                  kind: "qc_fuera_de_especificacion",
+                  title: `QC fuera de especificación en ${order.orderNumber}`,
+                  body: spec
+                    ? `${input.parameter}: ${input.measuredValue}${spec.unit ? ` ${spec.unit}` : ""} (rango ${spec.minValue ?? "—"} a ${spec.maxValue ?? "—"}).`
+                    : `${input.parameter}: ${input.measuredValue} registrado como no conforme.`,
+                  link: `/produccion/${order.id}`,
+                },
+              })
+            : [];
+        return { qcResult: created, emails: pending };
+      });
+      await deliverEmails(emails, ctx.user.id);
+      return qcResult;
+    }),
 
   // `release` is the blueprint's "firma final" (Section 8): director_tecnico's
   // legal release of a batch to market. Same step-up pattern as
@@ -136,9 +174,8 @@ export const qcRouter = router({
         const specs = await tx.qcSpecification.findMany({
           where: { tenantId, formulaId: current.formulaId },
         });
-        const normalize = (parameter: string) => parameter.trim().toLowerCase();
-        const measured = new Set(results.map((r) => normalize(r.parameter)));
-        const missing = specs.filter((spec) => !measured.has(normalize(spec.parameter)));
+        const measured = new Set(results.map((r) => normalizeParameter(r.parameter)));
+        const missing = specs.filter((spec) => !measured.has(normalizeParameter(spec.parameter)));
         if (missing.length > 0) {
           throw new TRPCError({
             code: "BAD_REQUEST",

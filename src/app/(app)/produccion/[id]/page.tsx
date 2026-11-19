@@ -8,6 +8,10 @@ import { EventTimeline } from "@/components/batch/EventTimeline";
 import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
 import { isSignableStage, STAGE_SIGNER_ROLES } from "@/lib/validation/production";
 import { WEIGHABLE_STATUSES, getMissingIngredients } from "@/lib/production/weighing";
+import { AttachmentList } from "@/components/attachments/AttachmentList";
+import { AttachmentUploader } from "@/components/attachments/AttachmentUploader";
+import { listAttachments } from "@/lib/attachments/service";
+import { UPLOAD_ROLES } from "@/lib/validation/attachments";
 
 export default async function BatchRecordPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,6 +45,10 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
     order.status === "pesado"
       ? (await withTenant(user.tenantId, user.id, (tx) => getMissingIngredients(tx, user.tenantId, order))).length
       : 0;
+  const evidence = await withTenant(user.tenantId, user.id, (tx) =>
+    listAttachments(tx, user.tenantId, "production_order", order.id),
+  );
+  const canUploadEvidence = UPLOAD_ROLES.production_order.includes(user.role);
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,6 +110,20 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
         <h2 className="font-sans text-lg font-semibold text-foreground">Eventos del lote</h2>
         <EventTimeline events={order.events} />
       </div>
+
+      <section aria-labelledby="evidence-title" className="flex flex-col gap-3">
+        <h2 id="evidence-title" className="font-sans text-lg font-semibold text-foreground">
+          Evidencias del lote
+        </h2>
+        <AttachmentList items={evidence} emptyText="Aún no hay evidencias adjuntas a esta orden." />
+        {canUploadEvidence && (
+          <AttachmentUploader
+            entityType="production_order"
+            entityId={order.id}
+            label="Adjuntar evidencia (foto o documento)"
+          />
+        )}
+      </section>
     </div>
   );
 }

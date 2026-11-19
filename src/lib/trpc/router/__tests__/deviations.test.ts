@@ -27,8 +27,23 @@ const deviationFindFirstOrThrow = vi.fn(async () => ({
 const deviationFindMany = vi.fn(async () => []);
 let deviationById: { id: string } | null = { id: "dev1" };
 const deviationFindFirst = vi.fn(async () => deviationById);
-let orderForCreate: { id: string } | null = { id: "po1" };
+let orderForCreate: { id: string; orderNumber: string } | null = { id: "po1", orderNumber: "OP-2026-001" };
 const productionOrderFindFirst = vi.fn(async () => orderForCreate);
+
+type UserFindManyArgs = Prisma.UserFindManyArgs;
+type NotificationCreateArgs = Prisma.NotificationCreateManyAndReturnArgs;
+const userFindMany = vi.fn(async (args: UserFindManyArgs) => {
+  void args;
+  return [{ id: "u-dir", email: "director@lab.co" }];
+});
+const notificationCreateManyAndReturn = vi.fn(async (args: NotificationCreateArgs) => {
+  const rows = Array.isArray(args.data) ? args.data : [args.data];
+  return rows.map((row, index) => ({ id: `n${index}`, recipientUserId: row.recipientUserId }));
+});
+// `vi.hoisted`: the mock factory below reads this spy at module-load time.
+const deliverEmails = vi.hoisted(() => vi.fn(async (emails: unknown[], actorUserId: string) => void [emails, actorUserId]));
+
+vi.mock("@/lib/notifications/deliver", () => ({ deliverEmails }));
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
@@ -41,6 +56,8 @@ vi.mock("@/lib/db", () => ({
         findMany: deviationFindMany,
       },
       productionOrder: { findFirst: productionOrderFindFirst },
+      user: { findMany: userFindMany },
+      notification: { createManyAndReturn: notificationCreateManyAndReturn },
     }),
 }));
 
@@ -84,7 +101,7 @@ describe("deviations.create", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updateManyCount = 1;
-    orderForCreate = { id: "po1" };
+    orderForCreate = { id: "po1", orderNumber: "OP-2026-001" };
   });
 
   // Final review (Critical 2): a deviation must never attach to another
@@ -113,6 +130,47 @@ describe("deviations.create", () => {
     });
     expect(result.status).toBe("abierta");
     expect(deviationCreate).toHaveBeenCalled();
+  });
+
+  it("notifies calidad and director_tecnico (never the reporter) and emails after commit", async () => {
+    await caller("operario").create({
+      productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
+      description: "Temperatura de mezcla fuera de rango",
+    });
+    expect(userFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: "t1",
+          role: { in: ["calidad", "director_tecnico"] },
+          id: { not: "u1" },
+        }),
+      }),
+    );
+    expect(notificationCreateManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            recipientUserId: "u-dir",
+            kind: "desviacion_creada",
+            title: "Nueva desviación en OP-2026-001",
+            link: "/calidad/desviaciones/dev1",
+          }),
+        ],
+      }),
+    );
+    expect(deliverEmails).toHaveBeenCalledWith(
+      [expect.objectContaining({ to: "director@lab.co", notificationId: "n0" })],
+      "u1",
+    );
+  });
+
+  it("creates no notification and sends nothing when the order is outside the tenant", async () => {
+    orderForCreate = null;
+    await expect(
+      caller("operario").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(notificationCreateManyAndReturn).not.toHaveBeenCalled();
+    expect(deliverEmails).not.toHaveBeenCalled();
   });
 });
 
@@ -179,6 +237,14 @@ describe("deviations.submitInvestigation", () => {
       }),
     );
     expect(result.id).toBe("dev1");
+    expect(userFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ role: { in: ["director_tecnico"] } }) }),
+    );
+    expect(notificationCreateManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ kind: "desviacion_pendiente_aprobacion", link: "/calidad/desviaciones/dev1" })],
+      }),
+    );
   });
 
   it("throws CONFLICT (TOCTOU guard) when the deviation is not en_investigacion", async () => {
