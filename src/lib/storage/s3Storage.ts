@@ -11,8 +11,8 @@ export type S3StorageConfig = {
 };
 
 export function createS3Storage(config: S3StorageConfig): FileStorage {
-  // Path-style addressing: required by Supabase Storage's S3 endpoint and
-  // MinIO; AWS S3 accepts it too.
+  // Path-style addressing: required by MinIO and most self-hosted S3
+  // servers; AWS S3 accepts it too.
   const client = new S3Client({
     endpoint: config.endpoint,
     region: config.region,

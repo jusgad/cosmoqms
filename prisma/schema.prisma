@@ -280,7 +280,7 @@ model Deviation {
   // way `approvedBy`/`approvedAt` are — set only once `startInvestigation`
   // runs. Same as `a2146d2`'s precedent (task 11 review round 1's
   // `@@unique([productionOrderId, stage])`): edited directly in schema.prisma
-  // without running `prisma migrate dev`, since Task 3 (Supabase/RLS, live
+  // without running `prisma migrate dev`, since Task 3 (RLS on the live
   // DB) remains BLOCKED — the actual migration is deferred until Task 3
   // unblocks; `prisma generate` (client codegen only, no DB connection
   // needed) is run instead so the typed Prisma Client used by
@@ -391,7 +391,7 @@ enum AttachmentKind {
 
 // Files are never deleted or replaced (BPM record integrity): a correction is
 // a new upload. `storageKey` is the driver-relative path (local disk or a
-// Supabase Storage object key) and always starts with the tenant id.
+// S3 object key) and always starts with the tenant id.
 model Attachment {
   id         String           @id @default(uuid())
   tenantId   String           @map("tenant_id")

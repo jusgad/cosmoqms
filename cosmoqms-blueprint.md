@@ -35,7 +35,7 @@ Lo que Mariposa **no** tiene, y que es la razón de ser de este blueprint, son t
 2. **Captura offline-first en planta** — cola local (Dexie) + service worker + sync idempotente por `clientEventId`. Mariposa es un SPA de Vite normal: sin conexión, se pierde la captura.
 3. **Multi-tenant real** (`organizations` + Row Level Security por `tenant_id`). Mariposa es de una sola empresa, sin ningún concepto de tenant.
 
-**Decisión de alcance (2026-09-25):** CosmoQMS se construye como **proyecto completamente aparte** — carpeta hermana de `programa_Cosmetico_Mariposa` (no anidada), repo git propio, proyecto Supabase propio, app Clerk propia. No se toca ni se depende en tiempo de ejecución de Mariposa ERP. Al mismo tiempo, el diseño se mantiene **modular a propósito** para poder adherirlo a Mariposa más adelante sin reescritura, mediante tres mecanismos ya incorporados en el modelo de datos y la arquitectura (Secciones 3–6): `organizations` permite que el laboratorio de Mariposa se convierta en el tenant #1 el día que se decida migrar; cada dominio de negocio es un router tRPC independiente sin imports cruzados, adoptable uno a la vez; y el vocabulario de entidades (Sección 4.1) se mantiene deliberadamente cercano al de Mariposa para que una futura migración de datos tenga un mapeo de campos obvio en vez de una traducción desde cero.
+**Decisión de alcance (2026-09-25):** CosmoQMS se construye como **proyecto completamente aparte** — carpeta hermana de `programa_Cosmetico_Mariposa` (no anidada), repo git propio, base PostgreSQL propia, app Clerk propia. No se toca ni se depende en tiempo de ejecución de Mariposa ERP. Al mismo tiempo, el diseño se mantiene **modular a propósito** para poder adherirlo a Mariposa más adelante sin reescritura, mediante tres mecanismos ya incorporados en el modelo de datos y la arquitectura (Secciones 3–6): `organizations` permite que el laboratorio de Mariposa se convierta en el tenant #1 el día que se decida migrar; cada dominio de negocio es un router tRPC independiente sin imports cruzados, adoptable uno a la vez; y el vocabulario de entidades (Sección 4.1) se mantiene deliberadamente cercano al de Mariposa para que una futura migración de datos tenga un mapeo de campos obvio en vez de una traducción desde cero.
 
 ---
 
@@ -48,12 +48,12 @@ Lo que Mariposa **no** tiene, y que es la razón de ser de este blueprint, son t
 | Styling | Tailwind CSS v4 | Sistema de diseño basado en tokens, consistente entre escritorio y móvil |
 | Components | shadcn/ui + TanStack Table | `DataTable` para listados densos de lotes/materias primas; formularios accesibles con validación inline |
 | PWA / Offline | Serwist (service worker) + Dexie.js (IndexedDB) | Cola local de eventos append-only cuando no hay señal en planta; sincroniza al reconectar sin sobrescribir nada |
-| Database | PostgreSQL (Supabase) | Row Level Security aplica el aislamiento multi-tenant a nivel de base de datos, no solo de código — defensa en profundidad para datos regulados |
+| Database | PostgreSQL 16 (Docker, autoalojado) | Row Level Security aplica el aislamiento multi-tenant a nivel de base de datos, no solo de código — defensa en profundidad para datos regulados |
 | ORM | Prisma | Mejor velocidad de desarrollo y migraciones versionadas; SQL crudo solo en reportes de trazabilidad complejos |
 | Auth | Clerk (Organizations + MFA) | Cada empresa futura = una Organization aislada nativamente; MFA obligatorio para Calidad/Dirección Técnica; step-up de reautenticación al firmar |
 | API | tRPC (mutaciones/queries internas) + REST idempotente (`/api/sync/events`) | Tipado extremo a extremo + endpoint de sincronización offline con dedupe por `client_event_id` |
 | PDF | Playwright (HTML → PDF) | Batch record firmado, certificados de análisis, exportables para el auditor |
-| Hosting | Vercel (app) + Supabase (BD/Storage) | Cero carga operativa para un equipo de 8 sin IT dedicado; backups automáticos, región `sa-east-1` (más cercana a Colombia) |
+| Hosting | Docker Compose (app + PostgreSQL + volumen de adjuntos) | Sin dependencia de un proveedor de BD; los datos regulados quedan en infraestructura propia, con backups `pg_dump` programados |
 | Package Manager | pnpm | Instalaciones rápidas, monorepo-ready si se necesita después |
 
 ---
@@ -369,7 +369,7 @@ model BatchEvent {
 }
 ```
 
-### Row Level Security (Supabase)
+### Row Level Security (PostgreSQL)
 ```sql
 alter table production_orders enable row level security;
 create policy tenant_isolation on production_orders
@@ -531,7 +531,7 @@ Cookies httpOnly gestionadas por Clerk (rotación automática). Para **firmar un
 Se crea como carpeta **hermana** de `programa_Cosmetico_Mariposa` (no anidada dentro), con su propio repo git — ver Sección 1.1. `pnpm create next-app cosmoqms --typescript --tailwind --app`. Instalar shadcn/ui (`npx shadcn@latest init`), configurar path alias `@/`, Prettier/ESLint estrictos. Cargar tokens de diseño (Sección 7) en `tailwind.config.ts` y `globals.css` (light + dark).
 
 **Step 2 — Base de datos y multi-tenant**
-Crear proyecto Supabase (región `sa-east-1`). Escribir `prisma/schema.prisma` completo (todas las entidades de la Sección 4). `prisma migrate dev --name init`. Activar RLS y escribir la policy de aislamiento por `tenant_id` en cada tabla (patrón de la Sección 4).
+Levantar PostgreSQL 16 en Docker (`docker-compose.yml`). Escribir `prisma/schema.prisma` completo (todas las entidades de la Sección 4). `prisma migrate dev --name init`. Activar RLS y escribir la policy de aislamiento por `tenant_id` en cada tabla (patrón de la Sección 4).
 
 **Step 3 — Auth (Clerk)**
 Instalar `@clerk/nextjs`. Configurar Organizations, roles custom (`operario`, `jefe_planta`, `calidad`, `director_tecnico`, `bodega`, `admin`), forzar MFA por rol. `middleware.ts` protege `(app)/*` y resuelve tenant. Webhook `/api/webhooks/clerk` sincroniza usuarios/organizaciones a la tabla `users`/`organizations`.
@@ -570,7 +570,7 @@ Middleware de Prisma (`$use`) que, en la misma transacción de cualquier mutaci�
 `lib/pdf.ts` con Playwright: batch record completo (todas las etapas, pesajes, firmas, resultados QC) → PDF. Certificado de análisis. Dashboard con KPIs (rendimiento por lote, tasa de desviaciones, tiempo promedio de liberación).
 
 **Step 15 — Pulido y despliegue**
-Loading/empty/error states en todas las pantallas. Seed de datos de prueba. Deploy a Vercel + variables de entorno + dominio. Smoke test manual del flujo completo: recepción de MP → fórmula → orden → pesaje offline → sincronización → firma → QC → liberación → PDF.
+Loading/empty/error states en todas las pantallas. Seed de datos de prueba. Deploy con Docker Compose + variables de entorno + dominio. Smoke test manual del flujo completo: recepción de MP → fórmula → orden → pesaje offline → sincronización → firma → QC → liberación → PDF.
 
 ---
 
@@ -579,19 +579,18 @@ Loading/empty/error states en todas las pantallas. Seed de datos de prueba. Depl
 ### Prerequisites
 - Node.js 20+
 - pnpm 9+
-- Cuenta Supabase (proyecto en región `sa-east-1`)
+- Docker + Docker Compose (PostgreSQL 16)
 - Cuenta Clerk (con Organizations habilitado)
 
 ### Environment Variables
 | Variable | Description | Where to Get |
 |----------|-------------|---------------|
-| `DATABASE_URL` | Connection string Postgres (pooled) | Supabase → Settings → Database |
-| `DIRECT_URL` | Connection string directa (para migraciones) | Supabase → Settings → Database |
+| `DATABASE_URL` | Connection string Postgres (rol de ejecución) | `docker-compose.yml` → servicio `db` |
+| `DIRECT_URL` | Connection string directa (para migraciones) | `docker-compose.yml` → servicio `db` |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clave pública Clerk | Clerk Dashboard → API Keys |
 | `CLERK_SECRET_KEY` | Clave secreta Clerk | Clerk Dashboard → API Keys |
 | `CLERK_WEBHOOK_SECRET` | Verifica webhooks de sync de usuarios | Clerk Dashboard → Webhooks |
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app | — |
-| `SUPABASE_SERVICE_ROLE_KEY` | Solo para contextos server-only de confianza (nunca en cliente) | Supabase → Settings → API |
 
 ### Initial Setup Commands
 ```bash
@@ -637,16 +636,16 @@ pnpm dev
 ## 12. Deployment Strategy
 
 ### Hosting
-Vercel para la app Next.js (deploy automático desde `main`, preview deploys por PR). Supabase gestiona Postgres, Storage (COAs, documentos SOP) y backups automáticos diarios. Proyecto Supabase, app Vercel y repo git **propios de CosmoQMS**, separados de los de Mariposa ERP (Sección 1.1) — nada se comparte hoy.
+Docker Compose: app Next.js, PostgreSQL 16 y volumen de adjuntos (COAs, documentos SOP), con `pg_dump` diario a almacenamiento externo. Base de datos y repo git **propios de CosmoQMS**, separados de los de Mariposa ERP (Sección 1.1) — nada se comparte hoy.
 
 ### CI/CD
 `main` → deploy automático a producción. PRs → preview deploy + lint + typecheck + unit tests como checks obligatorios antes de mergear. Sin ambiente de staging separado en v1 (los preview deploys cumplen esa función) — se añade staging dedicado si se pasa a multi-tenant real con clientes externos.
 
 ### Domain & DNS
-Subdominio propio de la empresa (ej. `qms.tulaboratorio.com`) apuntado por CNAME a Vercel.
+Subdominio propio de la empresa (ej. `qms.tulaboratorio.com`) apuntado al servidor, con un proxy HTTPS (Caddy/Nginx) delante de la app.
 
 ### Environments
-`development` (local, BD Supabase de desarrollo) → `preview` (por PR) → `production` (BD Supabase de producción, backups verificados con restore de prueba trimestral).
+`development` (local, PostgreSQL en Docker) → `preview` (por PR) → `production` (PostgreSQL de producción en Docker, backups verificados con restore de prueba trimestral).
 
 ---
 
@@ -694,7 +693,7 @@ Sistema interno de producción y calidad (MES/QMS) para laboratorio cosmético, 
 
 ## Tech Stack
 
-Next.js 15 (App Router) + TypeScript strict + Tailwind CSS v4 + shadcn/ui + PostgreSQL (Supabase) + Prisma + Clerk (Organizations + MFA) + tRPC + Serwist (PWA) + Dexie (offline) + Playwright (PDF) + Vercel
+Next.js 15 (App Router) + TypeScript strict + Tailwind CSS v4 + shadcn/ui + PostgreSQL 16 (Docker) + Prisma + Clerk (Organizations + MFA) + tRPC + Serwist (PWA) + Dexie (offline) + Playwright (PDF) + Vercel
 
 ## Architecture
 
@@ -747,7 +746,6 @@ Primary `#0891B2` · Secondary `#22D3EE` · Accent/Liberado `#16A34A` · Pendien
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk pública |
 | `CLERK_SECRET_KEY` | Clerk secreta |
 | `CLERK_WEBHOOK_SECRET` | Verificación de webhooks Clerk |
-| `SUPABASE_SERVICE_ROLE_KEY` | Solo contextos server-only de confianza |
 | `NEXT_PUBLIC_APP_URL` | URL pública de la app |
 
 ## Reglas No Negociables
@@ -755,7 +753,7 @@ Primary `#0891B2` · Secondary `#22D3EE` · Accent/Liberado `#16A34A` · Pendien
 1. `batch_events` es append-only — nunca `UPDATE`/`DELETE`, solo `INSERT`. Una corrección es un evento nuevo.
 2. Toda mutación sobre una tabla regulada (`production_orders`, `batch_events`, `qc_results`, `deviations`, `finished_product_lots`) debe escribir en `audit_log` en la misma transacción.
 3. Ninguna firma electrónica se persiste sin `reauth_verified = true` y `meaning_statement` explícito.
-4. Todo query debe respetar Row Level Security por `tenant_id` — el `service role` de Supabase solo se usa en webhooks/migraciones, nunca en rutas de usuario.
+4. Todo query debe respetar Row Level Security por `tenant_id` — la app se conecta con un rol sin superusuario ni BYPASSRLS; el rol dueño de las tablas solo se usa en migraciones, nunca en rutas de usuario.
 5. TypeScript strict, sin `any`.
 6. Los eventos offline usan `clientEventId` generado en el dispositivo — el servidor debe ignorar duplicados, nunca aplicarlos dos veces.
 7. Las transiciones de etapa del lote se validan en el servidor como máquina de estados — nunca se confía en el estado enviado por el cliente.
@@ -772,7 +770,7 @@ Primary `#0891B2` · Secondary `#22D3EE` · Accent/Liberado `#16A34A` · Pendien
 1. **`batch_events` es append-only.** Nunca `UPDATE` ni `DELETE` — toda corrección es un nuevo evento compensatorio. Es la base de la integridad de datos exigida por INVIMA.
 2. **Auditoría obligatoria en la misma transacción.** Cualquier escritura sobre una tabla regulada debe generar su fila en `audit_log` atómicamente — si la auditoría falla, la mutación falla.
 3. **Firma electrónica = reautenticación + declaración de significado.** Sin `reauth_verified = true` y sin `meaning_statement`, no hay firma válida, y sin firma no hay transición de etapa.
-4. **Row Level Security por `tenant_id` en cada tabla, sin excepción.** El `service role` de Supabase nunca se expone a una ruta invocada por un usuario final.
+4. **Row Level Security por `tenant_id` en cada tabla, sin excepción.** El rol dueño de las tablas (superusuario) nunca se usa en una ruta invocada por un usuario final.
 5. **Las transiciones de estado de un lote se validan en el servidor.** El cliente nunca decide en qué etapa está un batch.
 6. **Idempotencia en la sincronización offline.** `client_event_id` único, `ON CONFLICT DO NOTHING` — cero duplicados, cero pérdida de eventos.
 7. **TypeScript strict, cero `any`.**

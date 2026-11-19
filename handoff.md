@@ -12,7 +12,7 @@ El build está **terminado y fusionado en `main`**. Repo: `C:\Users\sebas\Docume
 - Se hizo una revisión final de todo el branch (más allá de la revisión por tarea) que encontró y corrigió bugs reales de producción, no solo cosas de estilo:
   - `ProductionOrder.orderNumber` era único globalmente en vez de por tenant → un segundo cliente nunca podía crear una orden. Corregido a `@@unique([tenantId, orderNumber])`.
   - Faltaban filtros explícitos por `tenantId` en varias consultas (dependían solo de RLS, que no existía). Corregido en todos los routers.
-  - El archivo `supabase/rls.sql` tenía bugs reales (comparaba `text` contra `::uuid`, no forzaba RLS, no manejaba los paths de auth/webhook que corren fuera del contexto de tenant). Corregido.
+  - El archivo `db/rls.sql` tenía bugs reales (comparaba `text` contra `::uuid`, no forzaba RLS, no manejaba los paths de auth/webhook que corren fuera del contexto de tenant). Corregido.
   - Faltaba la forma de rechazar un lote (`qc.reject`), el release no exigía que hubiera resultados de QC, las firmas no restringían qué rol firma qué etapa, el PDF tenía un hueco de inyección HTML, el CI no tenía versión de pnpm fijada, y un bug de UI que ocultaba el botón de pesaje después del primer ingrediente en fórmulas multi-ingrediente.
   - Todo esto está corregido y re-verificado.
 
@@ -23,45 +23,33 @@ El build está **terminado y fusionado en `main`**. Repo: `C:\Users\sebas\Docume
 
 ## Lo único que falta es infraestructura externa — no código
 
-### 1. Supabase (bloqueante para casi todo lo demás)
-`.env` en este momento **solo tiene `DATABASE_URL`/`DIRECT_URL`** (hay que confirmar si ya son las reales o siguen siendo placeholders de `localhost` — revisar antes de asumir). Faltan:
-- `SUPABASE_SERVICE_ROLE_KEY`
-- Confirmar que `DATABASE_URL`/`DIRECT_URL` son del proyecto Supabase real (región `sa-east-1` recomendada), no `localhost`.
-
-**Nunca se ha corrido una migración contra una base viva.** No existe ningún archivo en `prisma/migrations/` — el esquema se validó solo con `prisma format`/`validate`/`generate` contra un `.env` de placeholder.
-
-Próximo paso una vez estén las credenciales:
-```bash
-pnpm exec prisma migrate dev --name init
-```
+### 1. Base de datos (actualizado 2026-11-19)
+Se retiró Supabase. La base es un PostgreSQL 16 propio en Docker (`docker-compose.yml`, servicio `db`, puerto 5433 en el host). Las migraciones se aplican solas con el servicio `migrate` (`prisma migrate deploy`). Ver `DEPLOY.md`.
 
 ### 2. Clerk
 Las llaves básicas (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) ya estaban puestas en algún momento de la sesión anterior — confirmar que siguen ahí. Falta `CLERK_WEBHOOK_SECRET` si no se ha configurado el webhook todavía.
 
 ### 3. Row Level Security
-`supabase/rls.sql` (en el repo, ya corregido en la revisión final) necesita:
-- Un rol de conexión a Postgres que **no sea superusuario** (el rol `postgres` por defecto de Supabase tiene `BYPASSRLS`, así que las políticas no sirven de nada si la app se conecta con ese rol). El archivo trae una plantilla comentada para crear ese rol.
+`db/rls.sql` (en el repo, ya corregido en la revisión final) necesita:
+- Un rol de conexión a Postgres que **no sea superusuario** (el usuario `cosmoqms_app` de Docker es superusuario y se salta RLS, así que las políticas no sirven de nada si la app se conecta con ese rol). El archivo trae una plantilla comentada para crear el rol `cosmoqms_runtime`.
 - Aplicar el SQL contra la base real.
 - Probar aislamiento: crear una orden con el tenant A, confirmar que el tenant B no la ve.
 
 ### 4. Decisión de producto pendiente
 ¿El rol `admin` debe ver la pantalla de **Auditoría** en el menú lateral? Quedó implementado que sí (`src/components/layout/Sidebar.tsx`), pero nunca se confirmó explícitamente con el usuario — es una inferencia del blueprint, no una instrucción directa.
 
-### 5. Cómo probar la app localmente (una vez Supabase esté conectado)
+### 5. Cómo probar la app localmente (con Docker)
 **Importante:** `prisma/seed.ts` crea usuarios de prueba directo en la base de datos, pero esos usuarios **no tienen cuentas reales de Clerk**, así que no sirven para iniciar sesión. Para probar la app de verdad:
 
-1. Confirmar `.env` con credenciales reales de Supabase.
-2. `pnpm exec prisma migrate dev --name init`
+1. `docker compose up -d db migrate` (base + migraciones).
+2. `.env` con `DATABASE_URL`/`DIRECT_URL` apuntando a `localhost:5433`.
 3. (Opcional) `pnpm exec prisma db seed` — para tener materias primas/fórmula de ejemplo, aunque no para login.
 4. `pnpm dev` → abrir `http://localhost:3000`
 5. Registrarse en `/login` (crea cuenta + organización real en Clerk) → el webhook crea automáticamente la fila en `users`/`organizations` con rol `operario` por defecto.
 6. Para probar otros roles sin crear 6 cuentas: `pnpm exec prisma studio`, buscar tu fila en `users`, cambiar el campo `role` manualmente (`admin`, `director_tecnico`, `calidad`, etc.), guardar y recargar la app.
 
-### 6. Vercel (al final, para desplegar en internet)
-1. Crear proyecto en Vercel, conectar el repo de GitHub.
-2. Root Directory: la raíz del repo (no hay subcarpeta).
-3. Pegar todas las variables de `.env.example` en Vercel (Preview y Production).
-4. Deploy.
+### 6. Despliegue
+Con Docker Compose (ver `DEPLOY.md`). Vercel solo sirve si se le da un PostgreSQL accesible desde internet.
 5. Smoke test completo: login → recibir materia prima → crear fórmula → activarla → crear orden → pesar (probar offline/online) → firmar cada etapa → QC → liberar lote → descargar PDF.
 
 ## Comandos útiles

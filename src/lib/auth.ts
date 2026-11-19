@@ -8,7 +8,7 @@ export type CurrentUser = { id: string; tenantId: string; role: Role };
 // `withTenant(orgId, ...)` — i.e. with `app.current_tenant_id` set to the
 // session's active Clerk Organization — instead of on the bare top-level
 // `prisma` client. A user's Clerk id is globally unique, so the lookup itself
-// needs no tenant filter; but once `supabase/rls.sql` is enforced, the
+// needs no tenant filter; but once `db/rls.sql` is enforced, the
 // `users` policy only exposes rows whose `tenant_id` matches
 // `app.current_tenant_id`. On a bare client that setting is unset
 // (`current_setting(..., true)` is NULL), the policy matches nothing, and

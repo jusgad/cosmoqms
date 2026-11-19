@@ -10,9 +10,9 @@ export interface FileStorage {
 
 // STORAGE_DRIVER=local (default): files on disk under STORAGE_LOCAL_DIR —
 // a Docker volume in docker-compose. STORAGE_DRIVER=s3: any S3-compatible
-// bucket (Supabase Storage's S3 endpoint, AWS S3, MinIO). The S3 driver uses
-// bucket-scoped S3 access keys, never the Supabase service-role key
-// (CLAUDE.md rule 4: service role is for webhooks/migrations only).
+// bucket (AWS S3, MinIO, Cloudflare R2). The S3 driver uses
+// bucket-scoped S3 access keys, never the database owner credentials
+// (CLAUDE.md rule 4: privileged roles are for migrations only).
 export function getStorage(env: NodeJS.ProcessEnv = process.env): FileStorage {
   const driver = env.STORAGE_DRIVER ?? "local";
   if (driver === "local") {

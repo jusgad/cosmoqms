@@ -51,7 +51,7 @@ function fullNameFrom(firstName: string | null, lastName: string | null, fallbac
 // Final-review fix (Critical 2c, RLS readiness): every write here runs
 // inside `withTenant(<the org the event is about>, ...)` rather than on the
 // bare top-level `prisma` client, so `app.current_tenant_id` is set and the
-// `organizations`/`users` RLS policies in `supabase/rls.sql` (which use
+// `organizations`/`users` RLS policies in `db/rls.sql` (which use
 // `current_setting('app.current_tenant_id', true)`) admit exactly the rows
 // this event concerns. On a bare client that setting is NULL, and once RLS is
 // enforced every upsert here would be refused by the policy's `WITH CHECK`.
@@ -84,7 +84,7 @@ async function upsertUserFromMembership(membership: OrganizationMembershipJSON):
   // `users` row under a DIFFERENT tenant (moved between organizations), the
   // policy hides that row from this tenant-scoped upsert, which then tries an
   // INSERT and fails on the primary key. Multi-org membership is out of the
-  // current single-org MVP scope; see supabase/rls.sql's header.
+  // current single-org MVP scope; see db/rls.sql's header.
   await withTenant(tenantId, WEBHOOK_ACTOR, (tx) =>
     tx.user.upsert({
       where: { id: userId },

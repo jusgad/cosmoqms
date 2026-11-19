@@ -1,34 +1,34 @@
 -- Row Level Security policies for multi-tenancy (CosmoQMS)
 --
--- STATUS: NOT YET APPLIED to any database. Task 3 (Supabase project + live
--- Postgres) is blocked, so this file has never been run. It is written to be
--- applied once, after `prisma migrate deploy` has created the tables, and is
--- safe to re-run (every policy is dropped-if-exists before being created).
+-- STATUS: NOT YET APPLIED to any database. The database is the self-hosted
+-- PostgreSQL 16 of docker-compose.yml (no managed provider). This file is
+-- written to be applied once, after `prisma migrate deploy` has created the
+-- tables, and is safe to re-run (every policy is dropped-if-exists before
+-- being created).
 --
 -- ============================================================================
 -- READ THIS BEFORE APPLYING: RLS ONLY PROTECTS A NON-BYPASS ROLE
 -- ============================================================================
 -- PostgreSQL skips RLS entirely for superusers and for any role with the
 -- BYPASSRLS attribute, and (without FORCE) also for the table's OWNER.
--- Prisma migrations create these tables as the connecting role — on Supabase
--- that is normally `postgres`, which owns the tables and has BYPASSRLS. If
--- the app's runtime `DATABASE_URL` connects as that same role, every policy
--- below is silently ignored and tenant isolation rests entirely on the
--- application-level `tenantId` filters.
+-- Prisma migrations create these tables as the connecting role. In
+-- docker-compose.yml that is `cosmoqms_app` — the image's POSTGRES_USER,
+-- which is a SUPERUSER and owns every table. If the app's runtime
+-- `DATABASE_URL` connects as that same role, every policy below is silently
+-- ignored and tenant isolation rests entirely on the application-level
+-- `tenantId` filters.
 --
 -- Therefore, once this is applied:
---   1. `DATABASE_URL` (runtime, pooled) MUST connect as a dedicated role that
---      is NOT a superuser, does NOT have BYPASSRLS, and does NOT own the
---      tables. Choosing/creating that role requires live Supabase access and
---      is out of scope for the code build — a template is at the bottom of
---      this file (commented out).
+--   1. `DATABASE_URL` (runtime) MUST connect as a dedicated role that is NOT
+--      a superuser, does NOT have BYPASSRLS, and does NOT own the tables — a
+--      template is at the bottom of this file (commented out).
 --   2. `DIRECT_URL` (migrations only) keeps using the owner role.
 --   3. Every table below also gets `FORCE ROW LEVEL SECURITY`, so that even
 --      the table owner is subject to the policies (defense in depth in case
 --      the runtime role ever ends up being the owner). FORCE does NOT affect
 --      superusers or BYPASSRLS roles — point 1 is still required.
---   4. CLAUDE.md rule 4: the Supabase `service_role` key is only for
---      webhooks/migrations, never user-facing routes.
+--   4. CLAUDE.md rule 4: the owner/superuser role is only for migrations and
+--      trusted server-only jobs, never for user-facing routes.
 --
 -- ============================================================================
 -- HOW THE TENANT IS RESOLVED
@@ -285,21 +285,21 @@ create policy tenant_isolation_insert on attachments
   with check (tenant_id = (select public.app_current_tenant_id()));
 
 -- ============================================================================
--- TEMPLATE (commented out — requires live Supabase access; do NOT run blindly)
+-- TEMPLATE (commented out — run as the owner role; do NOT run blindly)
 -- ============================================================================
 -- A dedicated runtime role that RLS actually applies to. Put its credentials
 -- in DATABASE_URL; keep DIRECT_URL on the owner role for migrations.
 --
--- create role cosmoqms_app login password '<generate-a-strong-secret>'
+-- create role cosmoqms_runtime login password '<generate-a-strong-secret>'
 --   nosuperuser nobypassrls nocreatedb nocreaterole;
--- grant usage on schema public to cosmoqms_app;
--- grant select, insert, update, delete on all tables in schema public to cosmoqms_app;
+-- grant usage on schema public to cosmoqms_runtime;
+-- grant select, insert, update, delete on all tables in schema public to cosmoqms_runtime;
 -- -- Append-only tables: no UPDATE/DELETE privilege at all (belt and braces
 -- -- on top of the missing RLS policies above).
--- revoke update, delete on batch_events, audit_log from cosmoqms_app;
--- grant execute on function public.app_current_tenant_id() to cosmoqms_app;
+-- revoke update, delete on batch_events, audit_log from cosmoqms_runtime;
+-- grant execute on function public.app_current_tenant_id() to cosmoqms_runtime;
 -- alter default privileges in schema public
---   grant select, insert, update, delete on tables to cosmoqms_app;
+--   grant select, insert, update, delete on tables to cosmoqms_runtime;
 --
 -- Sanity check after switching DATABASE_URL (should return f, f):
 -- select rolsuper, rolbypassrls from pg_roles where rolname = current_user;
