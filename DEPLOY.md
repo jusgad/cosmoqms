@@ -50,6 +50,19 @@ hacen falta para correr Prisma o `pnpm dev` desde tu máquina (ver
    `organizationMembership.created`, `organizationMembership.updated`.
    Copiar el Signing Secret a `CLERK_WEBHOOK_SECRET`.
 
+### Primer administrador
+
+Todo usuario nuevo entra como `operario`. Después del primer registro, nombra al
+primer administrador una sola vez desde la consola (como dueño de la base):
+
+```bash
+docker compose exec db psql -U cosmoqms_app -d cosmoqms -c "update users set role = 'admin' where email = '<correo>'"
+```
+
+Desde ahí los roles se cambian en **Usuarios** (`/usuarios`), con auditoría. El
+rol que traiga la metadata de Clerk solo se usa al crear el usuario; el webhook
+nunca lo vuelve a sobrescribir.
+
 ## PASO 3 — Levantar todo
 
 ```bash

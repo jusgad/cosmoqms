@@ -89,7 +89,11 @@ async function upsertUserFromMembership(membership: OrganizationMembershipJSON):
     tx.user.upsert({
       where: { id: userId },
       create: { id: userId, tenantId, fullName, email, role },
-      update: { tenantId, fullName, email, role },
+      // The role is set from Clerk metadata only when the user is first
+      // created. Afterwards the app is the source of truth: admins change it
+      // in /usuarios (audited), and a later membership event must never
+      // silently overwrite that decision.
+      update: { tenantId, fullName, email },
     }),
   );
 }

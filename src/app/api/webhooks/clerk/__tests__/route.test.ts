@@ -12,7 +12,7 @@ vi.mock("svix", () => ({
 }));
 
 const organizationUpsert = vi.fn(async (args: { create: { id: string; name: string } }) => args.create);
-const userUpsert = vi.fn(async (args: { create: unknown }) => args.create);
+const userUpsert = vi.fn(async (args: { create: unknown; update: Record<string, unknown> }) => args.create);
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
@@ -117,7 +117,7 @@ describe("POST /api/webhooks/clerk — single-company auto-provisioning", () => 
             first_name: "Nueva",
             last_name: "Persona",
           },
-          public_metadata: {},
+          public_metadata: { role: "calidad" },
         },
       ]),
     );
@@ -129,5 +129,10 @@ describe("POST /api/webhooks/clerk — single-company auto-provisioning", () => 
     expect(userUpsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ id: "user_new", tenantId: "org_invited" }) }),
     );
+    // The role comes from Clerk metadata only on creation; an existing user's
+    // role is managed (and audited) in /usuarios, never overwritten here.
+    const upsertArgs = userUpsert.mock.calls[0][0];
+    expect(upsertArgs.create).toMatchObject({ role: "calidad" });
+    expect(upsertArgs.update).not.toHaveProperty("role");
   });
 });

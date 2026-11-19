@@ -15,7 +15,9 @@ import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import type { AuditSearchValues } from "@/lib/validation/audit";
 
-const REGULATED_TABLES = ["ProductionOrder", "BatchEvent", "QcResult", "Deviation", "FinishedProductLot"];
+// `User` is not a regulated table, but role and access changes from
+// /usuarios are audited too.
+const REGULATED_TABLES = ["ProductionOrder", "BatchEvent", "QcResult", "Deviation", "FinishedProductLot", "User"];
 
 function toDateTimeIso(dateOnly: string, endOfDay: boolean): string | undefined {
   if (!dateOnly) return undefined;
