@@ -99,6 +99,21 @@ Abre una sesión sin Clerk con el rol indicado. Solo funciona con
 (`src/lib/demoMode.ts`): en un dominio real se ignora aunque alguien copie
 `DEMO_MODE=true`. El `docker-compose.yml` normal lo fuerza a `false`.
 
+### Pruebas de extremo a extremo (E2E)
+
+Con el stack en modo demo arriba:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
+
+Recorren con navegador real el flujo BPM (recepción → liberación de lotes →
+fórmula al 100% → orden → pesaje → firma que exige reautenticación), los
+permisos de cada rol en escritorio y celular, la administración de usuarios,
+la API REST y el reporte BPM. Crean datos con códigos únicos, así que se
+pueden repetir sobre la misma base. El reporte queda en `playwright-report/`.
+
 ## PASO 6 — Producción
 
 - Backups: `pg_dump` diario del contenedor `db` hacia almacenamiento externo, y

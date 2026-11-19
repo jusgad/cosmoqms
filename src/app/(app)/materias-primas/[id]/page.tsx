@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { LotStatusBadge } from "@/components/materials/LotStatusBadge";
 import { LotStatusAction } from "@/components/materials/LotStatusAction";
@@ -10,10 +10,7 @@ import { UPLOAD_ROLES } from "@/lib/validation/attachments";
 
 export default async function LotDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.materiasPrimas);
 
   const result = await withTenant(user.tenantId, user.id, async (tx) => {
     const found = await tx.rawMaterialLot.findFirst({

@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { withTenant } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { isDemoMode } from "@/lib/demoMode";
@@ -21,15 +22,21 @@ export type CurrentUser = { id: string; tenantId: string; role: Role };
 // app URL and only with docker-compose.demo.yml (DEMO_MODE=true).
 // `DEMO_ROLE` picks which role the demo session plays (default
 // director_tecnico) — e.g. `admin` to exercise catalog writes from Postman.
-// An unknown value falls back to the default instead of inventing a role.
+// The `cosmoqms-demo-role` cookie overrides it per browser, so one E2E run
+// can act as every role; it is only read inside demo mode, which is itself
+// limited to localhost. An unknown value falls back instead of inventing a role.
+export const DEMO_ROLE_COOKIE = "cosmoqms-demo-role";
 const DEMO_ROLES: readonly Role[] = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
-function demoRole(): Role {
-  const requested = process.env.DEMO_ROLE;
-  return DEMO_ROLES.find((role) => role === requested) ?? "director_tecnico";
+function toDemoRole(value: string | undefined): Role | undefined {
+  return DEMO_ROLES.find((role) => role === value);
+}
+async function demoRole(): Promise<Role> {
+  const fromCookie = toDemoRole((await cookies()).get(DEMO_ROLE_COOKIE)?.value);
+  return fromCookie ?? toDemoRole(process.env.DEMO_ROLE) ?? "director_tecnico";
 }
 
 async function ensureDemoUser(): Promise<CurrentUser> {
-  const DEMO_USER: CurrentUser = { id: "demo-user", tenantId: "demo-org", role: demoRole() };
+  const DEMO_USER: CurrentUser = { id: "demo-user", tenantId: "demo-org", role: await demoRole() };
   await withTenant(DEMO_USER.tenantId, DEMO_USER.id, (tx) =>
     tx.organization.upsert({
       where: { id: DEMO_USER.tenantId },

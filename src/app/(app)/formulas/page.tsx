@@ -1,15 +1,11 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { FormulaStatusBadge } from "@/components/formulas/FormulaStatusBadge";
 
 export default async function FormulasPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.formulas);
 
   const formulas = await withTenant(user.tenantId, user.id, (tx) =>
     tx.masterFormula.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),

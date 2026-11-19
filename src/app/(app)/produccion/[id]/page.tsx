@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { StageTracker } from "@/components/batch/StageTracker";
@@ -15,10 +15,7 @@ import { UPLOAD_ROLES } from "@/lib/validation/attachments";
 
 export default async function BatchRecordPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.produccion);
 
   const order = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findFirst({

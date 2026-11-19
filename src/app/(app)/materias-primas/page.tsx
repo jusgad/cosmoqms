@@ -1,15 +1,11 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { LotsDataTable, type LotRow } from "@/app/(app)/materias-primas/LotsDataTable";
 
 export default async function MateriasPrimasPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.materiasPrimas);
 
   const lots = await withTenant(user.tenantId, user.id, (tx) =>
     tx.rawMaterialLot.findMany({

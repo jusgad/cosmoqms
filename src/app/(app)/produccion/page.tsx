@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { BatchStatus } from "@prisma/client";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { OrderColumn } from "@/components/production/OrderColumn";
@@ -27,10 +26,7 @@ const TERMINAL_COLUMNS: { status: BatchStatus; label: string }[] = [
 ];
 
 export default async function ProduccionPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.produccion);
 
   const orders = await withTenant(user.tenantId, user.id, (tx) =>
     tx.productionOrder.findMany({ where: { tenantId: user.tenantId }, orderBy: { orderNumber: "asc" }, include: { formula: true } }),

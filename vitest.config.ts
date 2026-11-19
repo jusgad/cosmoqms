@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 import react from "@vitejs/plugin-react";
 
@@ -12,5 +12,7 @@ export default defineConfig({
     // globally, so the (cheaper, faster) node environment stays the
     // default for the rest of the suite.
     environment: "node",
+    // e2e/ holds Playwright specs (pnpm test:e2e), not Vitest tests.
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 });

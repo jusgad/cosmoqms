@@ -1,5 +1,5 @@
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { DeviationForm } from "@/components/quality/DeviationForm";
 
@@ -10,10 +10,7 @@ import { DeviationForm } from "@/components/quality/DeviationForm";
 // mutate.
 export default async function DesviacionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.desviaciones);
 
   const deviation = await withTenant(user.tenantId, user.id, (tx) =>
     tx.deviation.findFirst({ where: { id, tenantId: user.tenantId }, include: { order: true } }),

@@ -20,7 +20,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen flex-col md:grid md:grid-cols-[240px_1fr]">
       <Sidebar role={user.role} />
-      <div className="flex min-h-screen flex-1 flex-col">
+      {/* min-w-0: lets wide content (the production Kanban) scroll inside
+          its own container instead of stretching the grid column and the
+          whole page sideways. */}
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <Header orgName={organization?.name ?? "CosmoQMS"} unreadNotifications={unreadNotifications} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>

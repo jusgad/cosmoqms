@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -15,10 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
 // open (`status !== "cerrada"`) — the same population `qc.release`'s guard
 // (Task 12) checks before allowing a batch to be released.
 export default async function DesviacionesPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.desviaciones);
 
   const deviations = await withTenant(user.tenantId, user.id, (tx) =>
     tx.deviation.findMany({

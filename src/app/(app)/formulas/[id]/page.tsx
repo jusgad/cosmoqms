@@ -1,15 +1,12 @@
-import { notFound, redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { FormulaStatusBadge } from "@/components/formulas/FormulaStatusBadge";
 import { FormulaActivateAction } from "@/components/formulas/FormulaActivateAction";
 
 export default async function FormulaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const user = await requirePageRole(MODULE_ROLES.formulas);
 
   const formula = await withTenant(user.tenantId, user.id, (tx) =>
     tx.masterFormula.findFirst({

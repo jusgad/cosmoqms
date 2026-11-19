@@ -15,7 +15,17 @@ const eslintConfig = [
     // `public/sw.js` is Serwist's generated service worker bundle (from
     // `src/app/sw.ts` via `swDest` in `next.config.ts`) — a build artifact,
     // not source, and already gitignored; it should never be linted.
-    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "public/sw.js"],
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+      "public/sw.js",
+      // Playwright output (pnpm test:e2e), generated and gitignored.
+      "playwright-report/**",
+      "test-results/**",
+    ],
   },
 ];
 
