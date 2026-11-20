@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: pnpm }
+        with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec prisma generate
       - run: pnpm lint
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20, cache: pnpm }
+        with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - name: Aplicar migraciones
         run: pnpm exec prisma migrate deploy
@@ -111,7 +111,7 @@ jobs:
         if: steps.llaves.outputs.ok == 'true'
       - uses: actions/setup-node@v4
         if: steps.llaves.outputs.ok == 'true'
-        with: { node-version: 20, cache: pnpm }
+        with: { node-version: 24, cache: pnpm }
       - name: Preparar .env de CI
         if: steps.llaves.outputs.ok == 'true'
         run: |

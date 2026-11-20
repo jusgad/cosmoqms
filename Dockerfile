@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- deps: install dependencies only (cached unless lockfile changes) ----
-FROM node:20-slim AS deps
+FROM node:24-slim AS deps
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
@@ -9,7 +9,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # ---- builder: generate Prisma client and build the Next.js app ----
-FROM node:20-slim AS builder
+FROM node:24-slim AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
@@ -19,7 +19,7 @@ RUN pnpm exec prisma generate
 RUN pnpm build
 
 # ---- runner: minimal image that only runs the standalone server ----
-FROM node:20-slim AS runner
+FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
