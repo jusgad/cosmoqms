@@ -45,3 +45,4 @@ iq-evidencia-*.txt
 
 # configuración local del editor
 .claude/
+CLAUDE.md
