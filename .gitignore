@@ -46,3 +46,6 @@ iq-evidencia-*.txt
 # configuración local del editor
 .claude/
 CLAUDE.md
+
+# material del trabajo final del SENA (no es parte del sistema)
+SENA/
