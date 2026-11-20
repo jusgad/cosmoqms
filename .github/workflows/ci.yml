@@ -1,14 +1,154 @@
 name: CI
-on: [pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  test:
+  # Lint, types, unit tests and a production build: a PR that does not build
+  # never reaches main.
+  calidad:
+    name: Calidad del código
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma generate
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
       - run: pnpm test
+      - name: Build de producción
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  # Applies every migration to an empty PostgreSQL 16, checks schema.prisma
+  # has no change without its migration, and runs the same security scripts
+  # as docker-compose (runtime role + RLS), then verifies they took effect.
+  base-de-datos:
+    name: Migraciones y seguridad de la base
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cosmoqms_app
+          POSTGRES_PASSWORD: ci_owner_password
+          POSTGRES_DB: cosmoqms
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cosmoqms_app -d cosmoqms"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://cosmoqms_app:ci_owner_password@localhost:5432/cosmoqms
+      DIRECT_URL: postgresql://cosmoqms_app:ci_owner_password@localhost:5432/cosmoqms
+      PGHOST: localhost
+      PGUSER: cosmoqms_app
+      PGPASSWORD: ci_owner_password
+      PGDATABASE: cosmoqms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Aplicar migraciones
+        run: pnpm exec prisma migrate deploy
+      - name: El esquema no tiene cambios sin migración
+        run: |
+          psql -c "create database shadow"
+          pnpm exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "postgresql://cosmoqms_app:ci_owner_password@localhost:5432/shadow" \
+            --exit-code
+      - name: Rol de la app y RLS (dos veces, deben ser idempotentes)
+        run: |
+          for run in 1 2; do
+            psql -v ON_ERROR_STOP=1 -v runtime_password=ci_runtime_password -f db/runtime-role.sql
+            psql -v ON_ERROR_STOP=1 -f db/rls.sql
+          done
+      - name: Verificar seguridad
+        run: sh scripts/verify-db-security.sh
+        env:
+          RUNTIME_DB_PASSWORD: ci_runtime_password
+
+  # Browser tests against the real Docker stack in demo mode. Needs the Clerk
+  # development keys as repository secrets (the middleware loads Clerk even
+  # in demo mode); without them the job is skipped, not failed.
+  e2e:
+    name: Pruebas E2E (Docker + Playwright)
+    needs: calidad
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLERK_PK: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SK: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+    steps:
+      - name: ¿Hay llaves de Clerk para E2E?
+        id: llaves
+        run: |
+          if [ -n "$CLERK_PK" ] && [ -n "$CLERK_SK" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::E2E omitidas: configure E2E_CLERK_PUBLISHABLE_KEY y E2E_CLERK_SECRET_KEY en los secretos del repositorio."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.llaves.outputs.ok == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.llaves.outputs.ok == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.llaves.outputs.ok == 'true'
+        with: { node-version: 20, cache: pnpm }
+      - name: Preparar .env de CI
+        if: steps.llaves.outputs.ok == 'true'
+        run: |
+          OWNER=$(openssl rand -hex 24); RUNTIME=$(openssl rand -hex 24)
+          {
+            echo "POSTGRES_PASSWORD=$OWNER"
+            echo "RUNTIME_DB_PASSWORD=$RUNTIME"
+            echo "DATABASE_URL=postgresql://cosmoqms_runtime:$RUNTIME@localhost:5433/cosmoqms"
+            echo "DIRECT_URL=postgresql://cosmoqms_app:$OWNER@localhost:5433/cosmoqms"
+            echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PK"
+            echo "CLERK_SECRET_KEY=$CLERK_SK"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3001"
+          } > .env
+      - name: Levantar el stack en modo demo
+        if: steps.llaves.outputs.ok == 'true'
+        run: |
+          DEMO_ROLE=admin docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --build
+          for i in $(seq 1 60); do curl -sf http://localhost:3001/api/health && break; sleep 3; done
+          curl -sf http://localhost:3001/api/health
+      - run: pnpm install --frozen-lockfile
+        if: steps.llaves.outputs.ok == 'true'
+      - name: Datos de demostración
+        if: steps.llaves.outputs.ok == 'true'
+        run: pnpm seed:demo
+      - run: pnpm exec playwright install --with-deps chromium
+        if: steps.llaves.outputs.ok == 'true'
+      - run: pnpm test:e2e
+        if: steps.llaves.outputs.ok == 'true'
+        env:
+          CI: "true"
+      - name: Reporte de Playwright
+        if: failure() && steps.llaves.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+      - name: Logs de la app
+        if: failure() && steps.llaves.outputs.ok == 'true'
+        run: docker compose logs --no-color cosmoqms migrate db-security | tail -200

@@ -115,12 +115,79 @@ firma, lectura del personal), configuración, paginación, usuarios,
 la API REST y el reporte BPM. Crean datos con códigos únicos, así que se
 pueden repetir sobre la misma base. El reporte queda en `playwright-report/`.
 
-## PASO 6 — Producción
+## PASO 6 — Backups
 
-- Backups: `pg_dump` diario del contenedor `db` hacia almacenamiento externo, y
-  una restauración de prueba cada trimestre (requisito BPM de integridad de datos).
-- Opcional: `SENTRY_DSN` para monitoreo de errores y `RESEND_API_KEY` para
-  correos de notificación.
+El servicio `backup` arranca con el resto del stack. Cada día a las
+`BACKUP_HOUR` (2:00 a. m. por defecto, hora de Bogotá):
+
+1. `pg_dump` de la base en `backups/base-de-datos/` y comprobación de que el
+   archivo se puede leer (`pg_restore --list`).
+2. Los adjuntos (COA, evidencias, documentos de SOP) en `backups/adjuntos/`.
+3. Suma SHA-256 de cada archivo y borrado de los de más de
+   `BACKUP_RETENTION_DAYS` días (30 por defecto).
+
+Si el último respaldo correcto tiene más de 26 horas, `docker compose ps`
+muestra el servicio `backup` como **unhealthy**.
+
+**Copia fuera del servidor (obligatoria):** un backup en la misma máquina se
+pierde con ella. Copia la carpeta `BACKUP_DIR` a diario a otro lugar: disco
+externo, NAS o nube (por ejemplo con `rclone sync` o una tarea programada).
+
+**Simulacro de restauración (cada trimestre, guardar la salida como
+evidencia BPM):**
+
+```bash
+docker compose exec backup sh /scripts/restore-test.sh
+```
+
+Restaura el último respaldo en una base temporal, verifica la suma SHA-256,
+compara las filas de cada tabla con la base actual y borra la base temporal.
+
+**Restaurar de verdad** (pérdida de datos), con la app detenida:
+
+```bash
+docker compose stop cosmoqms
+docker compose exec backup sh -c 'dropdb cosmoqms && createdb cosmoqms && pg_restore --no-owner --dbname=cosmoqms /backups/base-de-datos/<archivo>.dump'
+docker compose up -d
+```
+
+`docker compose up` vuelve a aplicar el rol de la app y RLS (`db-security`).
+Los adjuntos se recuperan descomprimiendo el `.tar.gz` en el volumen
+`cosmoqms-storage`.
+
+## PASO 7 — Monitoreo
+
+- **Salud:** `/api/health` responde si la app y la base están arriba. Docker
+  reinicia la app y la marca unhealthy si deja de responder.
+- **Caídas del servidor:** un monitor externo gratuito (UptimeRobot, Better
+  Stack) que consulte `https://<tu-dominio>/api/health` cada 5 minutos y avise
+  por correo o Telegram. Tiene que ser externo: si se apaga el servidor, nada
+  de adentro puede avisar.
+- **Errores de la app:** crea un proyecto en Sentry y pon `SENTRY_DSN` y
+  `NEXT_PUBLIC_SENTRY_DSN` en `.env`. Sin DSN no se envía nada.
+- **Correos de notificación:** `RESEND_API_KEY` y `NOTIFICATIONS_FROM_EMAIL`.
+
+## PASO 8 — Integración continua
+
+`.github/workflows/ci.yml` corre en cada push a `main` y en cada pull request:
+
+- **Calidad del código:** lint, tipos, pruebas unitarias y build de producción.
+- **Base de datos:** aplica las migraciones a un PostgreSQL vacío, falla si
+  `schema.prisma` tiene cambios sin migración, aplica el rol de la app y RLS
+  dos veces (deben ser idempotentes) y corre `scripts/verify-db-security.sh`.
+- **E2E:** levanta Docker en modo demo y corre Playwright. Necesita los
+  secretos `E2E_CLERK_PUBLISHABLE_KEY` y `E2E_CLERK_SECRET_KEY` (llaves de
+  desarrollo de Clerk) en GitHub → Settings → Secrets and variables → Actions;
+  sin ellos el trabajo se omite con un aviso.
+
+Para que nada llegue a `main` sin pasar el CI: GitHub → Settings → Branches →
+regla para `main` con "Require status checks to pass".
+
+La misma verificación de seguridad contra el Docker local:
+
+```bash
+docker compose exec -T -e RUNTIME_DB_PASSWORD=<la de .env> db sh < scripts/verify-db-security.sh
+```
 
 ## Comandos útiles
 

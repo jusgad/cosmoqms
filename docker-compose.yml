@@ -99,6 +99,39 @@ services:
       retries: 5
       start_period: 20s
 
+  # Daily backups (db/backup/): pg_dump of the database + tar of the
+  # attachments, with checksums and retention, into BACKUP_DIR on the host
+  # (copy that folder off the server: external disk, NAS or cloud). The
+  # healthcheck turns the container unhealthy if the last good backup is
+  # older than 26 h. Restore drill: docker compose exec backup sh /scripts/restore-test.sh
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command: ["sh", "/scripts/scheduler.sh"]
+    environment:
+      PGHOST: db
+      PGUSER: cosmoqms_app
+      PGDATABASE: cosmoqms
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}
+      BACKUP_HOUR: ${BACKUP_HOUR:-2}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      TZ: America/Bogota
+    volumes:
+      - ./db/backup:/scripts:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+      - cosmoqms-storage:/storage:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'last=$$(sed -n "s/^epoch=//p" /backups/ultimo-backup.txt 2>/dev/null); [ -n "$$last" ] && [ $$(( $$(date +%s) - last )) -lt 93600 ]'
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 10m
+
   # Optional HTTPS reverse proxy. With APP_DOMAIN=localhost (default) Caddy
   # uses its own local certificate; with a real domain pointed at this
   # server it obtains a Let's Encrypt certificate automatically.
