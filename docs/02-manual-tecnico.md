@@ -161,7 +161,7 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 
 | Control | Alcance |
 |---|---|
-| Pruebas unitarias (Vitest) | 42 archivos, 294 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI |
+| Pruebas unitarias (Vitest) | 44 archivos, 315 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor |
 | Pruebas E2E (Playwright) | 42 pruebas con navegador real contra Docker: flujo BPM completo, permisos de los 6 roles en escritorio y celular, SOPs, usuarios, API y reportes |
 | Integración continua | En cada cambio: lint, tipos, pruebas, build, migraciones en una base vacía y verificación de seguridad de la base |
 | Validación | Paquete IQ/OQ/PQ en [validacion/](validacion/01-plan-maestro-validacion.md) |

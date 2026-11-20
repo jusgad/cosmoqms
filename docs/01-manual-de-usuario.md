@@ -135,11 +135,33 @@ Hace todo lo del operario y además:
 ### Recibir materia prima
 
 1. **Materias Primas** → **Recibir lote**.
-2. Elija la materia prima, escriba el **código de lote del proveedor**, la
-   cantidad y la fecha de vencimiento. Si el empaque trae código de barras o QR
-   del proveedor, puede pulsar **Escanear**.
-3. **Recibir lote**. El lote queda en **Cuarentena** con su QR interno: imprímalo y péguelo.
-4. En el lote, adjunte el **certificado de análisis (COA)** en PDF y pulse **Subir**.
+2. Si el empaque trae QR o código de barras del proveedor, pulse **Leer QR del
+   proveedor** y apunte la cámara. Con un lector de mano (USB o Bluetooth), haga
+   clic en el campo **Lector de mano** y escanee. CosmoQMS llena los datos que
+   traiga el código y muestra un resumen de lo que leyó:
+   - materia prima, si el código o el nombre coincide con el catálogo;
+   - lote del proveedor, cantidad y fecha de vencimiento;
+   - enlace al COA y código del proveedor (por ejemplo, el GTIN).
+3. Revise cada campo y complete lo que falte: la materia prima, el **código de
+   lote del proveedor**, la cantidad y la fecha de vencimiento. Si el resumen dice
+   que la materia prima no está en el catálogo, selecciónela a mano.
+4. **Recibir lote**. El lote queda en **Cuarentena** con su QR interno, aunque
+   los datos hayan venido del QR del proveedor: imprímalo y péguelo.
+5. En el lote, adjunte el **certificado de análisis (COA)** en PDF y pulse **Subir**.
+
+Formatos de QR que CosmoQMS entiende:
+
+| Formato | Ejemplo |
+|---|---|
+| GS1 (estándar de la industria) | `(01)07701234567893(10)GLIC-118(17)270630(30)50` |
+| GS1 Digital Link | `https://id.gs1.org/01/07701234567893/10/GLIC-118?17=270630` |
+| JSON | `{"codigo":"MP-002","lote":"GLIC-118","cantidad":50,"vence":"2027-06-30"}` |
+| Texto con campos | `MATERIAL: Glicerina Vegetal; LOTE: GLIC-118; VENCE: 30/06/2027` |
+
+En GS1, el código de la materia prima se lee del campo `(240)`. Si su
+proveedor solo trae el GTIN `(01)`, registre ese GTIN como código de la materia
+prima en el catálogo para que se reconozca sola. Un código con otro formato se
+guarda tal cual en **Código del proveedor**.
 
 ### Buscar lotes
 
