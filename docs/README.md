@@ -20,6 +20,7 @@ cosmético, conforme a BPM e INVIMA.
 | [SOP-SIS-001 · Uso de la firma electrónica](procedimientos/SOP-SIS-001-firma-electronica.md) | Procedimiento que todo el personal que firma debe leer y aceptar |
 | [Paquete de validación IQ/OQ/PQ](validacion/01-plan-maestro-validacion.md) | Plan maestro, requisitos de usuario, protocolos IQ, OQ y PQ, y matriz de trazabilidad |
 | [API REST (OpenAPI 3.1)](api/openapi.yaml) | Contrato de la API para integraciones. Se importa en Postman o se abre en editor.swagger.io |
+| [Checklist de entrega](06-checklist-de-entrega.md) | Acta de entrega del sistema al laboratorio: instalación, validación, capacitación y firmas |
 
 ### Paquete de validación
 
