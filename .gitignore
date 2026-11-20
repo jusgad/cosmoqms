@@ -42,3 +42,6 @@ next-env.d.ts
 
 # evidencia de IQ (se archiva con el protocolo firmado, no en git)
 iq-evidencia-*.txt
+
+# configuración local del editor
+.claude/
