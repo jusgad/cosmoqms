@@ -22,10 +22,9 @@ function weighingLotId(payload: Prisma.JsonValue): string | undefined {
 // LOCAL + RLS". That contradicts the established convention in every prior
 // router (qc.ts, deviations.ts, production.ts, materials.ts) of always
 // including an explicit `tenantId` in `where` as defense-in-depth — a
-// convention Task 9's review explicitly called out, and one that matters
-// more, not less, while Task 3's RLS policies remain blocked with no live
-// DB to enforce them at all. Both procedures below filter by `tenantId`
-// explicitly, matching the rest of the codebase.
+// convention Task 9's review explicitly called out: RLS (db/rls.sql) and
+// the app-level filter are two independent walls. Both procedures below
+// filter by `tenantId` explicitly, matching the rest of the codebase.
 //
 // Real-gap resolution (see task-16-report.md): the brief's procedures took
 // a raw `*LotId: string().uuid()` input, but a calidad/director_tecnico user

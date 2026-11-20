@@ -39,3 +39,6 @@ next-env.d.ts
 
 # backups locales (docker-compose servicio backup)
 /backups
+
+# evidencia de IQ (se archiva con el protocolo firmado, no en git)
+iq-evidencia-*.txt

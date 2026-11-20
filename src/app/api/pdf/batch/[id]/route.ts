@@ -12,9 +12,9 @@ import { renderBatchRecordHtml, renderPdf, type BatchRecordOrder } from "@/lib/p
 // Review round 1 fix (task 18): the `where` clause also filters explicitly
 // by `tenantId` as defense-in-depth, matching `traceability.ts`'s explicit
 // rationale (every regulated query filters by `tenantId` even though
-// `withTenant`'s `SET LOCAL` already scopes it, because RLS policies don't
-// exist yet in a live DB — Task 3 remains blocked — so the app-level filter
-// is the only enforcement that actually runs today) and `deviations.ts`'s
+// `withTenant`'s `SET LOCAL` already scopes it and the RLS policies of
+// db/rls.sql enforce it again in the database: two independent walls) and
+// `deviations.ts`'s
 // `updateMany` guards. This matters more here than most routes: a PDF export
 // endpoint returning raw bytes of a regulated legal document, trivially
 // probed by id, is exactly the case defense-in-depth exists for.

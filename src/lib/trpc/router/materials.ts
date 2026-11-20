@@ -11,8 +11,8 @@ import {
 } from "@/lib/materials/catalog";
 
 // Tenant isolation (final review, Critical 2): every query filters by
-// `tenantId` explicitly (defense in depth while RLS is not applied to any
-// live DB — see production.ts's header).
+// `tenantId` explicitly (defense in depth on top of RLS — see
+// production.ts's header).
 //
 // Audit note: `raw_materials`/`raw_material_lots` are NOT among the five
 // regulated tables CLAUDE.md rule 2 names (`REGULATED_MODELS` in audit.ts),

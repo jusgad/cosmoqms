@@ -161,9 +161,7 @@ model ProductionOrder {
   // (P2002) — no tenant after the first could ever create an order. The
   // uniqueness guarantee is per-tenant, matching `RawMaterial`/
   // `MasterFormula`/`FinishedProductLot`'s own `@@unique([tenantId, ...])`
-  // keys. Edited directly without `prisma migrate dev` (Task 3 / live DB
-  // still BLOCKED — same precedent as the Deviation fields above); the
-  // migration is generated once a database exists.
+  // keys. Included in the initial migration.
   @@unique([tenantId, orderNumber])
   @@index([tenantId, status])
   @@map("production_orders")
@@ -278,13 +276,7 @@ model Deviation {
   // happened, since INVIMA audit review needs that timestamp/actor, not just
   // the later `pendiente_aprobacion` submission. Nullable/optional the same
   // way `approvedBy`/`approvedAt` are — set only once `startInvestigation`
-  // runs. Same as `a2146d2`'s precedent (task 11 review round 1's
-  // `@@unique([productionOrderId, stage])`): edited directly in schema.prisma
-  // without running `prisma migrate dev`, since Task 3 (RLS on the live
-  // DB) remains BLOCKED — the actual migration is deferred until Task 3
-  // unblocks; `prisma generate` (client codegen only, no DB connection
-  // needed) is run instead so the typed Prisma Client used by
-  // `deviations.ts`/tests reflects these fields now.
+  // runs. Included in the initial migration.
   investigationStartedBy String?         @map("investigation_started_by")
   investigationStartedAt DateTime?       @map("investigation_started_at")
   approvedBy             String?         @map("approved_by")

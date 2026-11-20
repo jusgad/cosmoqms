@@ -42,9 +42,7 @@ import { deliverEmails } from "@/lib/notifications/deliver";
 //    the two-step flow is the correct design, not just an alternative one.
 //    `Deviation.investigationStartedBy`/`investigationStartedAt` (added to
 //    the schema in this round) persist that moment; `schema.prisma`'s own
-//    comment documents why this was edited directly rather than via
-//    `prisma migrate dev` (Task 3/live DB still BLOCKED — same precedent as
-//    commit a2146d2's `@@unique([productionOrderId, stage])`).
+//    comment documents the change; it is part of the initial migration.
 export const deviationsRouter = router({
   // Not called from any Client Component — `desviaciones/page.tsx` and
   // `[id]/page.tsx` read Prisma directly instead (CLAUDE.md's Data Flow

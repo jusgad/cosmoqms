@@ -46,8 +46,9 @@ hacen falta para correr Prisma o `pnpm dev` desde tu máquina (ver
 2. **Multi-factor** → activar "Authenticator application".
 3. **API Keys** → copiar Publishable key y Secret key al `.env`.
 4. **Webhooks** → Add Endpoint → `https://<tu-dominio>/api/webhooks/clerk`,
-   eventos `organization.created`, `user.created`,
-   `organizationMembership.created`, `organizationMembership.updated`.
+   eventos `organization.created`, `user.created`, `user.updated` (sincroniza
+   la marca de MFA), `organizationMembership.created`,
+   `organizationMembership.updated`.
    Copiar el Signing Secret a `CLERK_WEBHOOK_SECRET`.
 
 ### Primer administrador

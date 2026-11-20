@@ -5,8 +5,8 @@ import { sumPercentages, isWithinTolerance } from "@/lib/formulas/validateCompos
 import { createFormulaInput } from "@/lib/validation/formulas";
 
 // Tenant isolation (final review, Critical 2): every query filters by
-// `tenantId` explicitly (defense in depth while RLS is not applied to any
-// live DB — see production.ts's header). `FormulaIngredient` has no
+// `tenantId` explicitly (defense in depth on top of RLS — see
+// production.ts's header). `FormulaIngredient` has no
 // `tenant_id` column of its own; it is scoped through its parent formula,
 // which is always verified to belong to the caller's tenant first.
 //

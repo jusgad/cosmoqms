@@ -15,9 +15,9 @@ import {
 
 // Tenant isolation (final review, Critical 2): every query below filters by
 // `tenantId: ctx.user.tenantId` explicitly, on top of `tenantTx`'s
-// `SET LOCAL app.current_tenant_id`. RLS is not applied to any live database
-// yet (Task 3 blocked), so this app-level filter is the only isolation that
-// actually runs today — same defense-in-depth convention Tasks 16/18
+// `SET LOCAL app.current_tenant_id`, which the RLS policies of db/rls.sql
+// enforce in the database. Two independent walls: a bug in one never
+// exposes another tenant — same defense-in-depth convention Tasks 16/18
 // established (`traceability.ts`, the PDF route). By-id lookups use
 // `findFirst` + an explicit NOT_FOUND, so another tenant's id is
 // indistinguishable from a nonexistent one.

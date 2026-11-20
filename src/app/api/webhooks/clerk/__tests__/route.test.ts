@@ -13,18 +13,23 @@ vi.mock("svix", () => ({
 
 const organizationUpsert = vi.fn(async (args: { create: { id: string; name: string } }) => args.create);
 const userUpsert = vi.fn(async (args: { create: unknown; update: Record<string, unknown> }) => args.create);
+const userUpdateMany = vi.fn(async (args: { where: unknown; data: unknown }) => {
+  void args;
+  return { count: 1 };
+});
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       organization: { upsert: organizationUpsert },
-      user: { upsert: userUpsert },
+      user: { upsert: userUpsert, updateMany: userUpdateMany },
     }),
 }));
 
 const getOrganizationList = vi.fn();
 const createOrganization = vi.fn();
 const createOrganizationMembership = vi.fn();
+const getOrganizationMembershipList = vi.fn();
 
 vi.mock("@clerk/nextjs/server", () => ({
   clerkClient: async () => ({
@@ -33,6 +38,7 @@ vi.mock("@clerk/nextjs/server", () => ({
       createOrganization,
       createOrganizationMembership,
     },
+    users: { getOrganizationMembershipList },
   }),
 }));
 
@@ -134,5 +140,27 @@ describe("POST /api/webhooks/clerk — single-company auto-provisioning", () => 
     const upsertArgs = userUpsert.mock.calls[0][0];
     expect(upsertArgs.create).toMatchObject({ role: "calidad" });
     expect(upsertArgs.update).not.toHaveProperty("role");
+  });
+});
+
+describe("POST /api/webhooks/clerk — user.updated", () => {
+  it("syncs only the MFA flag, in every tenant the user belongs to", async () => {
+    getOrganizationMembershipList.mockResolvedValue({ data: [{ organization: { id: "org_default" } }] });
+
+    const res = await POST(
+      new Request("http://localhost/api/webhooks/clerk", {
+        method: "POST",
+        headers: SVIX_HEADERS,
+        body: JSON.stringify({ type: "user.updated", data: { id: "user_1", two_factor_enabled: true } }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(getOrganizationMembershipList).toHaveBeenCalledWith({ userId: "user_1" });
+    expect(userUpdateMany).toHaveBeenCalledWith({
+      where: { id: "user_1", tenantId: "org_default" },
+      data: { mfaEnabled: true },
+    });
+    expect(userUpsert).not.toHaveBeenCalled();
   });
 });

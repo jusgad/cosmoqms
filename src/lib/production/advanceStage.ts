@@ -17,9 +17,8 @@ import { canTransition } from "@/lib/production/stateMachine";
 // - Final review (Critical 2): moved out of the router file into
 //   `lib/production/` (so `lib/production/weighing.ts` can use it without a
 //   circular import through `production.ts`), and it now takes `tenantId`
-//   and filters every query by it explicitly — defense in depth, since RLS
-//   policies are not yet applied to any live database (Task 3 blocked) and
-//   the app-level filter is the only tenant isolation that actually runs.
+//   and filters every query by it explicitly — defense in depth on top of
+//   the database's RLS policies (db/rls.sql).
 //   A cross-tenant `orderId` resolves to NOT_FOUND, never to another tenant's
 //   order.
 export async function advanceStageInternal(

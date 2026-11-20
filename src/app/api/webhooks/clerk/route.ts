@@ -159,6 +159,23 @@ async function handleMembershipUpdated(membership: OrganizationMembershipJSON): 
   await upsertUserFromMembership(membership);
 }
 
+// Keeps `users.mfa_enabled` in step with Clerk, so /usuarios shows who has
+// MFA (SOP-SIS-001 requires it for calidad, director técnico and admin and
+// Calidad reviews it every quarter). Only the flag is touched: role and
+// active state stay the app's decision.
+async function handleUserUpdated(data: UserJSON): Promise<void> {
+  const client = await clerkClient();
+  const memberships = await client.users.getOrganizationMembershipList({ userId: data.id });
+  for (const membership of memberships.data) {
+    await withTenant(membership.organization.id, WEBHOOK_ACTOR, (tx) =>
+      tx.user.updateMany({
+        where: { id: data.id, tenantId: membership.organization.id },
+        data: { mfaEnabled: data.two_factor_enabled },
+      }),
+    );
+  }
+}
+
 export async function POST(req: Request): Promise<NextResponse> {
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -193,6 +210,9 @@ export async function POST(req: Request): Promise<NextResponse> {
       break;
     case "user.created":
       await handleUserCreated(event.data);
+      break;
+    case "user.updated":
+      await handleUserUpdated(event.data);
       break;
     case "organizationMembership.created":
       await upsertUserFromMembership(event.data);

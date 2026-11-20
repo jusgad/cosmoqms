@@ -1,0 +1,365 @@
+openapi: 3.1.0
+info:
+  title: CosmoQMS API
+  version: 1.0.0
+  description: |
+    API HTTP de CosmoQMS (MES/QMS para laboratorio cosmético, BPM/INVIMA).
+
+    **Autenticación.** Todas las rutas, salvo `/api/health`, usan la sesión de
+    Clerk del navegador (cookie `__session`). No hay llaves de API: un
+    integrador debe iniciar sesión como un usuario con el rol adecuado.
+
+    **Aislamiento.** Cada respuesta contiene solo datos de la empresa (tenant)
+    del usuario. La base de datos lo refuerza con Row Level Security.
+
+    **Errores.** Todas las respuestas de error tienen la forma
+    `{ "error": "mensaje", "issues"?: [{ "path", "message" }] }`.
+
+    Las pantallas de la aplicación usan además procedimientos tRPC internos
+    (`/api/trpc/*`), que no forman parte de este contrato público.
+servers:
+  - url: http://localhost:3001
+    description: Docker local
+  - url: https://{dominio}
+    description: Producción
+    variables:
+      dominio:
+        default: qms.tulaboratorio.com
+security:
+  - sesionClerk: []
+tags:
+  - name: Salud
+  - name: Materias primas
+    description: Catálogo de materias primas (no los lotes recibidos).
+  - name: Reportes
+  - name: Registros de lote
+  - name: Adjuntos
+
+paths:
+  /api/health:
+    get:
+      tags: [Salud]
+      summary: Estado de la aplicación y la base de datos
+      description: Público, sin sesión. Pensado para monitores de disponibilidad.
+      security: []
+      responses:
+        "200":
+          description: La app y la base responden.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database, latencyMs, uptimeSeconds, timestamp]
+                properties:
+                  status: { type: string, const: ok }
+                  database: { type: string, const: ok }
+                  latencyMs: { type: integer, description: Tiempo de respuesta de la base en ms }
+                  uptimeSeconds: { type: integer }
+                  timestamp: { type: string, format: date-time }
+        "503":
+          description: La base de datos no responde.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: error }
+                  database: { type: string, const: unreachable }
+                  timestamp: { type: string, format: date-time }
+
+  /api/v1/materias-primas:
+    get:
+      tags: [Materias primas]
+      summary: Listar materias primas
+      description: "Roles: bodega, jefe_planta, calidad, director_tecnico, admin."
+      responses:
+        "200":
+          description: Lista ordenada por código.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, total]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/MateriaPrima" }
+                  total: { type: integer }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+    post:
+      tags: [Materias primas]
+      summary: Crear materia prima
+      description: "Roles: bodega, admin."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MateriaPrimaNueva" }
+            example: { code: MP-010, name: Pantenol USP, unit: kg, category: humectante }
+      responses:
+        "201":
+          description: Creada.
+          headers:
+            Location:
+              description: Ruta de la materia prima creada.
+              schema: { type: string, example: /api/v1/materias-primas/6e35b7f0-4132-4f4c-873c-153586c60052 }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/MateriaPrima" }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+        "409":
+          description: Ya existe una materia prima con ese código.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/materias-primas/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdMateriaPrima"
+    get:
+      tags: [Materias primas]
+      summary: Consultar una materia prima
+      description: "Roles: bodega, jefe_planta, calidad, director_tecnico, admin."
+      responses:
+        "200":
+          description: La materia prima.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/MateriaPrima" }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+        "404": { $ref: "#/components/responses/NoEncontrada" }
+    patch:
+      tags: [Materias primas]
+      summary: Modificar una materia prima
+      description: "Roles: bodega, admin. Solo cambia los campos enviados (al menos uno)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MateriaPrimaCambio" }
+            example: { name: Pantenol USP (grado farmacéutico), category: activo }
+      responses:
+        "200":
+          description: Modificada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/MateriaPrima" }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+        "404": { $ref: "#/components/responses/NoEncontrada" }
+        "409":
+          description: El nuevo código ya lo usa otra materia prima.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Materias primas]
+      summary: Eliminar una materia prima sin historial
+      description: |
+        Roles: bodega, admin. Solo se puede eliminar una materia prima que nunca
+        se recibió (sin lotes) ni se usa en fórmulas: el historial BPM se conserva.
+      responses:
+        "200":
+          description: Eliminada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, deleted]
+                properties:
+                  data: { $ref: "#/components/schemas/MateriaPrima" }
+                  deleted: { type: boolean, const: true }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+        "404": { $ref: "#/components/responses/NoEncontrada" }
+        "409":
+          description: Tiene lotes recibidos o aparece en fórmulas.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/reports/produccion:
+    get:
+      tags: [Reportes]
+      summary: Reporte consolidado de producción y calidad (BPM)
+      description: |
+        Roles: calidad, director_tecnico. Una fila por orden con actividad en el
+        período: fórmula y versión, fechas, resultados de QC, desviaciones,
+        firma de la decisión final y lotes de materia prima consumidos.
+        El CSV usa `;` como separador, coma decimal y BOM UTF-8 (Excel es-CO).
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date }, example: "2026-10-01" }
+        - { name: to, in: query, required: true, schema: { type: string, format: date }, example: "2026-10-31" }
+        - { name: format, in: query, schema: { type: string, enum: [csv, pdf], default: csv } }
+      responses:
+        "200":
+          description: El archivo del reporte.
+          content:
+            text/csv: { schema: { type: string } }
+            application/pdf: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+
+  /api/pdf/batch/{id}:
+    get:
+      tags: [Registros de lote]
+      summary: Registro de lote (batch record) en PDF
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid }, description: Id de la orden de producción }
+      responses:
+        "200":
+          description: El batch record con eventos, firmas y resultados de QC.
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+        "401": { description: Sin sesión. }
+        "403": { description: Rol sin acceso. }
+        "404": { description: La orden no existe en su empresa. }
+
+  /api/attachments:
+    post:
+      tags: [Adjuntos]
+      summary: Adjuntar un archivo
+      description: |
+        COA de un lote de materia prima (bodega, calidad), evidencia de una
+        orden (operario, jefe_planta, calidad) o documento de un SOP en
+        borrador (calidad, director_tecnico). PDF, PNG, JPEG o WebP de hasta
+        10 MB; el servidor verifica el tipo real del archivo. Los adjuntos no
+        se reemplazan ni se borran.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, entityType, entityId]
+              properties:
+                file: { type: string, format: binary }
+                entityType: { type: string, enum: [raw_material_lot, production_order, sop] }
+                entityId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Adjunto guardado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Adjunto" }
+        "400": { $ref: "#/components/responses/DatosInvalidos" }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+        "404": { description: La entidad no existe en su empresa. }
+        "409": { description: El SOP ya está aprobado; su documento no se puede cambiar. }
+        "413": { description: Archivo de más de 10 MB. }
+        "415": { description: Tipo de archivo no permitido. }
+
+  /api/attachments/{id}:
+    get:
+      tags: [Adjuntos]
+      summary: Descargar un adjunto
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: El archivo, con su tipo MIME original.
+          content:
+            application/octet-stream: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "404": { description: No existe o su rol no lo puede ver. }
+
+components:
+  securitySchemes:
+    sesionClerk:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: Cookie de sesión de Clerk, creada al iniciar sesión en la app.
+  parameters:
+    IdMateriaPrima:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: Materia prima no encontrada }
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              path: { type: string, example: name }
+              message: { type: string, example: El nombre es obligatorio }
+    MateriaPrima:
+      type: object
+      required: [id, tenantId, code, name, unit]
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string, description: Empresa (organización de Clerk) }
+        code: { type: string, maxLength: 32, example: MP-001 }
+        name: { type: string, maxLength: 120, example: Agua Desionizada }
+        unit: { type: string, maxLength: 16, example: kg }
+        category: { type: [string, "null"], maxLength: 60, example: solvente }
+    MateriaPrimaNueva:
+      type: object
+      required: [code, name, unit]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 32 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        unit: { type: string, minLength: 1, maxLength: 16 }
+        category: { type: string, maxLength: 60 }
+    MateriaPrimaCambio:
+      type: object
+      minProperties: 1
+      properties:
+        code: { type: string, minLength: 1, maxLength: 32 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        unit: { type: string, minLength: 1, maxLength: 16 }
+        category: { type: string, maxLength: 60 }
+    Adjunto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        uploadedAt: { type: string, format: date-time }
+  responses:
+    SinSesion:
+      description: No hay sesión activa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    SinPermiso:
+      description: El rol del usuario no puede hacer esta operación.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    DatosInvalidos:
+      description: Datos o parámetros inválidos; `issues` señala cada campo.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NoEncontrada:
+      description: No existe en su empresa.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
