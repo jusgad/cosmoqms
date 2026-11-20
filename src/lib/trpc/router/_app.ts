@@ -8,6 +8,8 @@ import { traceabilityRouter } from "@/lib/trpc/router/traceability";
 import { auditRouter } from "@/lib/trpc/router/audit";
 import { notificationsRouter } from "@/lib/trpc/router/notifications";
 import { usersRouter } from "@/lib/trpc/router/users";
+import { sopsRouter } from "@/lib/trpc/router/sops";
+import { organizationRouter } from "@/lib/trpc/router/organization";
 
 export const appRouter = router({
   materials: materialsRouter,
@@ -19,6 +21,8 @@ export const appRouter = router({
   audit: auditRouter,
   notifications: notificationsRouter,
   users: usersRouter,
+  sops: sopsRouter,
+  organization: organizationRouter,
 });
 
 export type AppRouter = typeof appRouter;

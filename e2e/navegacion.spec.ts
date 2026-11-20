@@ -14,6 +14,8 @@ const PAGES: Record<string, { title: string | RegExp; roles: Role[] }> = {
   "/reportes": { title: "Reportes", roles: ["calidad", "director_tecnico"] },
   "/auditoria": { title: "Auditoría", roles: ["director_tecnico", "admin"] },
   "/usuarios": { title: "Usuarios", roles: ["admin"] },
+  "/configuracion": { title: "Configuración", roles: ["admin"] },
+  "/sops": { title: "SOPs", roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"] },
   "/notificaciones": { title: "Notificaciones", roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
 };
 
@@ -53,15 +55,4 @@ test("la página no tiene scroll horizontal", async ({ page, context }) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow, `scroll horizontal en ${path}`).toBe(false);
   }
-});
-
-// Known gaps (group 2 of the roadmap): the menu links to these, but the
-// pages do not exist yet.
-test.fixme("SOPs y Configuración existen", async ({ page, context }) => {
-  await asRole(context, "admin");
-  await page.goto("/configuracion");
-  await expectHeading(page, "Configuración");
-  await asRole(context, "operario");
-  await page.goto("/sops");
-  await expectHeading(page, "SOPs");
 });

@@ -25,12 +25,32 @@ const TERMINAL_COLUMNS: { status: BatchStatus; label: string }[] = [
   { status: "rechazado", label: "Rechazado" },
 ];
 
+const FINISHED_PER_COLUMN = 20;
+
 export default async function ProduccionPage() {
   const user = await requirePageRole(MODULE_ROLES.produccion);
 
-  const orders = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findMany({ where: { tenantId: user.tenantId }, orderBy: { orderNumber: "asc" }, include: { formula: true } }),
-  );
+  // In-progress orders are always few and all shown. Finished ones only grow,
+  // so the board keeps the most recent per terminal column; the full history
+  // lives in Trazabilidad and the BPM report.
+  const orders = await withTenant(user.tenantId, user.id, async (tx) => {
+    const active = await tx.productionOrder.findMany({
+      where: { tenantId: user.tenantId, status: { in: COLUMNS.map((column) => column.status) } },
+      orderBy: { orderNumber: "asc" },
+      include: { formula: true },
+    });
+    const finished = await Promise.all(
+      TERMINAL_COLUMNS.map((column) =>
+        tx.productionOrder.findMany({
+          where: { tenantId: user.tenantId, status: column.status },
+          orderBy: { orderNumber: "desc" },
+          include: { formula: true },
+          take: FINISHED_PER_COLUMN,
+        }),
+      ),
+    );
+    return [...active, ...finished.flat()];
+  });
 
   const byStatus = (status: BatchStatus) => orders.filter((order) => order.status === status);
 

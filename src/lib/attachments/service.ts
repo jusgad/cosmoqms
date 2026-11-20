@@ -15,20 +15,30 @@ import {
 export class AttachmentError extends Error {
   constructor(
     message: string,
-    readonly status: 400 | 403 | 404 | 413 | 415,
+    readonly status: 400 | 403 | 404 | 409 | 413 | 415,
   ) {
     super(message);
   }
 }
 
 // The entity must exist in the caller's own tenant — an attachment can never
-// hang off another tenant's lot or order.
+// hang off another tenant's lot, order or SOP. A SOP's document is frozen
+// once the SOP is approved: a change is a new version, never a new file on
+// the approved one.
 async function assertEntityInTenant(
   tx: Prisma.TransactionClient,
   tenantId: string,
   entityType: AttachmentEntityType,
   entityId: string,
 ): Promise<void> {
+  if (entityType === "sop") {
+    const sop = await tx.sop.findFirst({ where: { id: entityId, tenantId }, select: { status: true } });
+    if (!sop) throw new AttachmentError("Procedimiento no encontrado", 404);
+    if (sop.status !== "borrador") {
+      throw new AttachmentError("El documento de un SOP aprobado no se puede cambiar; cree una nueva versión", 409);
+    }
+    return;
+  }
   const found =
     entityType === "raw_material_lot"
       ? await tx.rawMaterialLot.findFirst({ where: { id: entityId, tenantId }, select: { id: true } })

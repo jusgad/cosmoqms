@@ -17,7 +17,7 @@ import type { AuditSearchValues } from "@/lib/validation/audit";
 
 // `User` is not a regulated table, but role and access changes from
 // /usuarios are audited too.
-const REGULATED_TABLES = ["ProductionOrder", "BatchEvent", "QcResult", "Deviation", "FinishedProductLot", "User"];
+const REGULATED_TABLES = ["ProductionOrder", "BatchEvent", "QcResult", "Deviation", "FinishedProductLot", "User", "Sop", "Organization"];
 
 function toDateTimeIso(dateOnly: string, endOfDay: boolean): string | undefined {
   if (!dateOnly) return undefined;
@@ -44,7 +44,8 @@ export function AuditLogView() {
   const [filters, setFilters] = useState<AuditSearchValues>({});
   const [isExporting, setIsExporting] = useState(false);
 
-  const searchQuery = trpc.audit.search.useQuery(filters);
+  const [page, setPage] = useState(1);
+  const searchQuery = trpc.audit.search.useQuery({ ...filters, page });
   const exportQuery = trpc.audit.export.useQuery(filters, { enabled: false });
 
   function buildFilters(): AuditSearchValues {
@@ -59,6 +60,7 @@ export function AuditLogView() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFilters(buildFilters());
+    setPage(1);
   }
 
   async function handleExport() {
@@ -161,7 +163,7 @@ export function AuditLogView() {
               </tr>
             </thead>
             <tbody>
-              {searchQuery.data.map((row) => (
+              {searchQuery.data.rows.map((row) => (
                 <tr key={row.id} className="border-b border-border last:border-0 hover:bg-muted">
                   <td className="px-4 py-3 font-mono text-xs text-foreground">
                     {new Date(row.occurredAt).toLocaleString("es-CO")}
@@ -172,7 +174,7 @@ export function AuditLogView() {
                   <td className="px-4 py-3 font-mono text-xs text-foreground">{row.actorUserId}</td>
                 </tr>
               ))}
-              {searchQuery.data.length === 0 && (
+              {searchQuery.data.rows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground">
                     Sin registros de auditoría para estos filtros.
@@ -182,6 +184,28 @@ export function AuditLogView() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {searchQuery.isSuccess && searchQuery.data.total > 0 && (
+        <nav aria-label="Paginación" className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">
+            Página {searchQuery.data.page} de {Math.max(1, Math.ceil(searchQuery.data.total / searchQuery.data.pageSize))} ·{" "}
+            {searchQuery.data.total} registros
+          </span>
+          <div className="flex gap-2">
+            <Button variant="outline" className="min-h-11" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              className="min-h-11"
+              disabled={page * searchQuery.data.pageSize >= searchQuery.data.total}
+              onClick={() => setPage(page + 1)}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </nav>
       )}
     </div>
   );

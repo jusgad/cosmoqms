@@ -13,6 +13,8 @@ export const MODULE_ROLES = {
   // Deviations are reported from the floor (operario, jefe_planta) and the
   // reporter lands on the detail page — same roles as deviationsRouter.list.
   desviaciones: ["calidad", "director_tecnico", "jefe_planta", "operario"],
+  sops: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"],
+  configuracion: ["admin"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export async function requirePageRole(allowed: readonly Role[]): Promise<CurrentUser> {

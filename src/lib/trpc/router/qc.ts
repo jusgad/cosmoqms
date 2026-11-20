@@ -1,26 +1,13 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { auth } from "@clerk/nextjs/server";
+import { assertReverified } from "@/lib/reauth";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { advanceStageInternal } from "@/lib/production/advanceStage";
 import { recordResultInput, rejectInput, releaseInput } from "@/lib/validation/qc";
 import { evaluateAgainstSpec, normalizeParameter } from "@/lib/quality/evaluateSpec";
 import { notifyAudience } from "@/lib/notifications/notify";
 import { deliverEmails } from "@/lib/notifications/deliver";
-
-// Clerk step-up check shared by `release` and `reject` — the client-sent
-// `reauthVerified: true` alone is never trusted (same pattern as
-// `production.sign`, Task 11 review round 1).
-async function assertReverified(action: string): Promise<void> {
-  const { has } = await auth();
-  if (!has({ reverification: "strict" })) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: `Se requiere reautenticación (verificación de identidad) para ${action} el lote`,
-    });
-  }
-}
 
 // Writes the final-decision signature + its timeline event. Shared by
 // `release` (stage `liberado`) and `reject` (stage `rechazado`).
@@ -154,7 +141,7 @@ export const qcRouter = router({
   release: roleProcedure("director_tecnico")
     .input(releaseInput)
     .mutation(async ({ ctx, input }) => {
-      await assertReverified("liberar");
+      await assertReverified("liberar el lote");
 
       return tenantTx(ctx, async (tx) => {
         const tenantId = ctx.user.tenantId;
@@ -234,7 +221,7 @@ export const qcRouter = router({
   reject: roleProcedure("director_tecnico")
     .input(rejectInput)
     .mutation(async ({ ctx, input }) => {
-      await assertReverified("rechazar");
+      await assertReverified("rechazar el lote");
 
       return tenantTx(ctx, async (tx) => {
         const tenantId = ctx.user.tenantId;

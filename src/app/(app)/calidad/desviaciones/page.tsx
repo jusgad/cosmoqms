@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
+import { pageArgs, pageFromParam } from "@/lib/pagination";
+import { Pagination } from "@/components/layout/Pagination";
 
 const STATUS_LABEL: Record<string, string> = {
   abierta: "Abierta",
@@ -13,15 +15,22 @@ const STATUS_LABEL: Record<string, string> = {
 // same pattern as calidad/page.tsx (Task 12): lists deviations that are still
 // open (`status !== "cerrada"`) — the same population `qc.release`'s guard
 // (Task 12) checks before allowing a batch to be released.
-export default async function DesviacionesPage() {
+export default async function DesviacionesPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   const user = await requirePageRole(MODULE_ROLES.desviaciones);
+  const page = pageFromParam((await searchParams).pagina);
+  const where = { tenantId: user.tenantId, status: { not: "cerrada" as const } };
 
-  const deviations = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.deviation.findMany({
-      where: { tenantId: user.tenantId, status: { not: "cerrada" } },
-      orderBy: { id: "asc" },
-      include: { order: true },
-    }),
+  const [deviations, total] = await withTenant(user.tenantId, user.id, (tx) =>
+    Promise.all([
+      tx.deviation.findMany({
+        where,
+        // Newest orders first; `id` keeps the order stable between pages.
+        orderBy: [{ order: { orderNumber: "desc" } }, { id: "asc" }],
+        include: { order: true },
+        ...pageArgs(page),
+      }),
+      tx.deviation.count({ where }),
+    ]),
   );
 
   return (
@@ -72,6 +81,7 @@ export default async function DesviacionesPage() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} total={total} basePath="/calidad/desviaciones" />
     </div>
   );
 }

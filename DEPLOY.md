@@ -110,7 +110,8 @@ pnpm test:e2e
 
 Recorren con navegador real el flujo BPM (recepción → liberación de lotes →
 fórmula al 100% → orden → pesaje → firma que exige reautenticación), los
-permisos de cada rol en escritorio y celular, la administración de usuarios,
+permisos de cada rol en escritorio y celular, SOPs (borrador, aprobación con
+firma, lectura del personal), configuración, paginación, usuarios,
 la API REST y el reporte BPM. Crean datos con códigos únicos, así que se
 pueden repetir sobre la misma base. El reporte queda en `playwright-report/`.
 

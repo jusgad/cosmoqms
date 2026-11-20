@@ -9,6 +9,7 @@ export const auditSearchInput = z.object({
   actorUserId: z.string().min(1).optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
+  page: z.number().int().min(1).max(10_000).optional(),
 });
 
 export type AuditSearchValues = z.infer<typeof auditSearchInput>;

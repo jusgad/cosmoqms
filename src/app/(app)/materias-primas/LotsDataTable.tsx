@@ -1,9 +1,9 @@
 "use client";
 
-// Client Component: the listing needs client-side sorting and a free-text
-// filter over the received lots, which requires interactive state
-// (useReactTable + useState). The data itself is still fetched server-side
-// in page.tsx via direct Prisma access and passed down as a plain prop.
+// Client Component: client-side sorting of the current page needs
+// interactive state (useReactTable + useState). The search runs on the
+// server (a plain GET form, `?q=`) so it covers every page, not just the 25
+// rows loaded; the data is fetched in page.tsx and passed down as a prop.
 
 import { useState } from "react";
 import Link from "next/link";
@@ -12,7 +12,6 @@ import {
   type SortingState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -64,32 +63,38 @@ const columns: ColumnDef<LotRow, unknown>[] = [
   },
 ];
 
-export function LotsDataTable({ data }: { data: LotRow[] }) {
+export function LotsDataTable({ data, query }: { data: LotRow[]; query: string }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
   });
 
   const rows = table.getRowModel().rows;
 
   return (
     <div className="flex flex-col gap-3">
-      <input
-        value={globalFilter}
-        onChange={(event) => setGlobalFilter(event.target.value)}
-        placeholder="Buscar por código o nombre..."
-        aria-label="Buscar materia prima"
-        className="h-11 w-full max-w-sm rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:max-w-xs"
-      />
+      <form method="get" role="search" className="flex w-full max-w-md gap-2">
+        <input
+          type="search"
+          name="q"
+          defaultValue={query}
+          placeholder="Buscar por lote, código o nombre..."
+          aria-label="Buscar materia prima"
+          className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        />
+        <button
+          type="submit"
+          className="min-h-11 shrink-0 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground hover:border-primary focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          Buscar
+        </button>
+      </form>
       <div className="overflow-x-auto rounded-card border border-border bg-card">
         <table className="w-full min-w-[640px] border-collapse text-sm">
           <thead>

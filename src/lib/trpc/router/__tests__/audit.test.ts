@@ -35,9 +35,14 @@ const auditLogFindMany = vi.fn(async (args: { where: AuditLogWhereInput }): Prom
   return rows;
 });
 
+const auditLogCount = vi.fn(async (args: { where: AuditLogWhereInput }): Promise<number> => {
+  void args;
+  return 120;
+});
+
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
-    fn({ auditLog: { findMany: auditLogFindMany } }),
+    fn({ auditLog: { findMany: auditLogFindMany, count: auditLogCount } }),
 }));
 
 import { auditRouter } from "../audit";
@@ -64,7 +69,15 @@ describe("audit.search", () => {
         where: expect.objectContaining({ tenantId: "t1", tableName: "ProductionOrder", actorUserId: "u1" }),
       }),
     );
-    expect(result).toEqual(rows);
+    expect(result).toEqual({ rows, total: 120, page: 1, pageSize: 50 });
+  });
+
+  it("pages through the trail 50 rows at a time, newest first", async () => {
+    await caller("admin").search({ page: 3 });
+    expect(auditLogFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { occurredAt: "desc" }, skip: 100, take: 50 }),
+    );
+    expect(auditLogCount).toHaveBeenCalledWith({ where: expect.objectContaining({ tenantId: "t1" }) });
   });
 
   it("applies a date range filter when dateFrom/dateTo are given", async () => {

@@ -1,6 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { auditSearchInput } from "@/lib/validation/audit";
+import { pageArgs } from "@/lib/pagination";
+
+const AUDIT_PAGE_SIZE = 50;
 
 // Both `search` and `export` need the exact same tenant-scoped `where`
 // clause built from the same filters, so it's factored out once rather than
@@ -36,12 +39,17 @@ export const auditRouter = router({
   search: roleProcedure("admin", "director_tecnico")
     .input(auditSearchInput)
     .query(({ ctx, input }) =>
-      tenantTx(ctx, (tx) =>
-        tx.auditLog.findMany({
-          where: buildWhere(ctx.user.tenantId, input),
-          orderBy: { occurredAt: "desc" },
-        }),
-      ),
+      tenantTx(ctx, async (tx) => {
+        // Paginated: the audit trail only grows. The CSV export below still
+        // returns every matching row.
+        const page = input.page ?? 1;
+        const where = buildWhere(ctx.user.tenantId, input);
+        const [rows, total] = await Promise.all([
+          tx.auditLog.findMany({ where, orderBy: { occurredAt: "desc" }, ...pageArgs(page, AUDIT_PAGE_SIZE) }),
+          tx.auditLog.count({ where }),
+        ]);
+        return { rows, total, page, pageSize: AUDIT_PAGE_SIZE };
+      }),
     ),
 
   export: roleProcedure("admin", "director_tecnico")

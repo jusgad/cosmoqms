@@ -42,11 +42,11 @@ enum Role {
 }
 
 model User {
-  id         String       @id
-  tenantId   String       @map("tenant_id")
-  fullName   String       @map("full_name")
-  email      String
-  role       Role
+  id            String         @id
+  tenantId      String         @map("tenant_id")
+  fullName      String         @map("full_name")
+  email         String
+  role          Role
   mfaEnabled    Boolean        @default(false) @map("mfa_enabled")
   active        Boolean        @default(true)
   tenant        Organization   @relation(fields: [tenantId], references: [id])
@@ -310,18 +310,40 @@ model FinishedProductLot {
   @@map("finished_product_lots")
 }
 
+// Controlled document (BPM document control). Lifecycle: `borrador` (editable,
+// its PDF is attached while in draft) -> `vigente` (approved by the director
+// técnico with an electronic signature; the previous vigente version of the
+// same code becomes `obsoleto` in the same transaction). Versions are never
+// edited or deleted once approved: a change is a new version.
 model Sop {
-  id              String              @id @default(uuid())
-  tenantId        String              @map("tenant_id")
-  code            String
-  title           String
-  fileUrl         String              @map("file_url")
-  version         Int                 @default(1)
-  tenant          Organization        @relation(fields: [tenantId], references: [id])
-  acknowledgments SopAcknowledgment[]
+  id               String              @id @default(uuid())
+  tenantId         String              @map("tenant_id")
+  code             String
+  title            String
+  fileUrl          String?             @map("file_url")
+  version          Int                 @default(1)
+  status           SopStatus           @default(borrador)
+  changeSummary    String?             @map("change_summary")
+  createdBy        String              @map("created_by")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  approvedBy       String?             @map("approved_by")
+  approvedAt       DateTime?           @map("approved_at")
+  meaningStatement String?             @map("meaning_statement")
+  effectiveDate    DateTime?           @map("effective_date") @db.Date
+  reviewDue        DateTime?           @map("review_due") @db.Date
+  obsoletedAt      DateTime?           @map("obsoleted_at")
+  tenant           Organization        @relation(fields: [tenantId], references: [id])
+  acknowledgments  SopAcknowledgment[]
 
   @@unique([tenantId, code, version])
+  @@index([tenantId, status])
   @@map("sops")
+}
+
+enum SopStatus {
+  borrador
+  vigente
+  obsoleto
 }
 
 model SopAcknowledgment {
@@ -382,11 +404,13 @@ model Notification {
 enum AttachmentEntity {
   raw_material_lot
   production_order
+  sop
 }
 
 enum AttachmentKind {
   coa
   evidencia
+  documento
 }
 
 // Files are never deleted or replaced (BPM record integrity): a correction is

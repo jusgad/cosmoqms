@@ -98,7 +98,48 @@ function evaluate(value: number, spec: { minValue: number; maxValue: number }): 
   return value < spec.minValue || value > spec.maxValue ? "fail" : "pass";
 }
 
+// Controlled documents for the SOP screens. Demo history only: these are
+// marked as already approved (the real flow requires an attached PDF and the
+// director's electronic signature with Clerk re-verification). Idempotent on
+// its own, so it also runs on a tenant seeded before SOPs existed.
+const SOPS = [
+  { code: "SOP-LIM-001", title: "Limpieza y sanitización de áreas de fabricación", version: 1, status: "obsoleto", effective: "2025-06-01", review: "2026-06-01" },
+  { code: "SOP-LIM-001", title: "Limpieza y sanitización de áreas de fabricación", version: 2, status: "vigente", effective: "2026-06-01", review: "2028-06-01", change: "Se cambia el agente sanitizante a amonio cuaternario de 5.ª generación." },
+  { code: "SOP-PES-001", title: "Pesaje de materias primas", version: 1, status: "vigente", effective: "2026-03-15", review: "2028-03-15" },
+] as const;
+
+async function seedSops(): Promise<void> {
+  const count = await withTenant(TENANT, DEMO_USER, (tx) => tx.sop.count({ where: { tenantId: TENANT } }));
+  if (count > 0) return;
+  await withTenant(TENANT, DEMO_USER, async (tx) => {
+    for (const sop of SOPS) {
+      const effectiveDate = new Date(`${sop.effective}T00:00:00.000Z`);
+      await tx.sop.create({
+        data: {
+          tenantId: TENANT,
+          code: sop.code,
+          title: sop.title,
+          version: sop.version,
+          status: sop.status,
+          changeSummary: "change" in sop ? sop.change : null,
+          createdBy: "demo-calidad",
+          createdAt: new Date(effectiveDate.getTime() - 7 * DAY),
+          approvedBy: DEMO_USER,
+          // 10:00 a. m. in Bogotá on the effective date.
+          approvedAt: new Date(effectiveDate.getTime() + 15 * HOUR),
+          meaningStatement: "Apruebo este procedimiento como versión vigente y autorizo su uso en planta",
+          effectiveDate,
+          reviewDue: new Date(`${sop.review}T00:00:00.000Z`),
+          obsoletedAt: sop.status === "obsoleto" ? new Date("2026-06-01T00:00:00.000Z") : null,
+        },
+      });
+    }
+  });
+  console.log(`SOPs de demostración: ${SOPS.length}.`);
+}
+
 async function main(): Promise<void> {
+  await seedSops();
   const existing = await withTenant(TENANT, DEMO_USER, (tx) => tx.productionOrder.count({ where: { tenantId: TENANT } }));
   if (existing > 0) {
     console.log(`demo-org ya tiene ${existing} órdenes: no se siembra nada.`);

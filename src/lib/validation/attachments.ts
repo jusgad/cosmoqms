@@ -10,26 +10,30 @@ export type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
 
 export const ACCEPT_ATTRIBUTE = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
 
-export const ATTACHMENT_ENTITIES = ["raw_material_lot", "production_order"] as const;
+export const ATTACHMENT_ENTITIES = ["raw_material_lot", "production_order", "sop"] as const;
 export type AttachmentEntityType = (typeof ATTACHMENT_ENTITIES)[number];
 
 // The entity decides the kind: a raw-material lot carries its supplier's
-// certificate of analysis, a production order carries floor evidence.
+// certificate of analysis, a production order carries floor evidence, a SOP
+// carries its controlled document (only while it is a draft).
 export const KIND_FOR_ENTITY = {
   raw_material_lot: "coa",
   production_order: "evidencia",
-} as const satisfies Record<AttachmentEntityType, "coa" | "evidencia">;
+  sop: "documento",
+} as const satisfies Record<AttachmentEntityType, "coa" | "evidencia" | "documento">;
 
 // Plain string literals (not the Prisma `Role` enum) keep this module
 // client-bundle safe; the service enforces these server-side.
 export const UPLOAD_ROLES: Record<AttachmentEntityType, readonly string[]> = {
   raw_material_lot: ["bodega", "calidad"],
   production_order: ["operario", "jefe_planta", "calidad"],
+  sop: ["calidad", "director_tecnico"],
 };
 
 export const VIEW_ROLES: Record<AttachmentEntityType, readonly string[]> = {
   raw_material_lot: ["bodega", "jefe_planta", "calidad", "director_tecnico", "admin"],
   production_order: ["operario", "jefe_planta", "calidad", "director_tecnico", "admin"],
+  sop: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"],
 };
 
 export const uploadAttachmentFields = z.object({

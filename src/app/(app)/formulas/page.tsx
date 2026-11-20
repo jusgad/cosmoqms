@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
+import { pageArgs, pageFromParam } from "@/lib/pagination";
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/layout/Pagination";
 import { FormulaStatusBadge } from "@/components/formulas/FormulaStatusBadge";
 
-export default async function FormulasPage() {
+export default async function FormulasPage({ searchParams }: { searchParams: Promise<{ pagina?: string }> }) {
   const user = await requirePageRole(MODULE_ROLES.formulas);
+  const page = pageFromParam((await searchParams).pagina);
+  const where = { tenantId: user.tenantId };
 
-  const formulas = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.masterFormula.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" } }),
+  const [formulas, total] = await withTenant(user.tenantId, user.id, (tx) =>
+    Promise.all([
+      tx.masterFormula.findMany({ where, orderBy: [{ name: "asc" }, { version: "desc" }], ...pageArgs(page) }),
+      tx.masterFormula.count({ where }),
+    ]),
   );
 
   return (
@@ -68,6 +75,7 @@ export default async function FormulasPage() {
           </tbody>
         </table>
       </div>
+      <Pagination page={page} total={total} basePath="/formulas" />
     </div>
   );
 }
