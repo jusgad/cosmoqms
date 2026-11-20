@@ -22,7 +22,7 @@ Ejecute sobre el commit a liberar y adjunte la salida completa de cada comando:
 |---|---|---|---|---|---|
 | OQ-A1 | `pnpm test` | Todas las pruebas unitarias pasan (0 fallidas) | | | |
 | OQ-A2 | `pnpm exec tsc --noEmit` y `pnpm lint` | Sin errores | | | |
-| OQ-A3 | `pnpm test:e2e` (stack en modo demo, ver DEPLOY.md) | Todas las pruebas E2E pasan (0 fallidas) | | | |
+| OQ-A3 | `pnpm test:e2e` (stack en modo demo, ver manual de desarrollador, sección 7.2) | Todas las pruebas E2E pasan (0 fallidas) | | | |
 | OQ-A4 | Ejecución del CI en GitHub para el commit | Los trabajos "Calidad del código", "Migraciones y seguridad de la base" y "Pruebas E2E" en verde (adjunte el enlace) | | | |
 
 La [matriz de trazabilidad](06-matriz-de-trazabilidad.md) indica qué requisito
@@ -48,7 +48,7 @@ Registre en "Obtenido" lo observado, con captura de pantalla cuando se pida.
 | OQ-B10 | URS-11 | Director técnico intenta liberar ese lote | El sistema lo impide (resultado no conforme). Con un lote conforme y sin desviaciones abiertas, libera tras reautenticarse | | | |
 | OQ-B11 | URS-12 | Operario reporta una desviación; calidad investiga con causa y CAPA; director aprueba | La desviación recorre Abierta → En investigación → Pendiente de aprobación → Cerrada, cada paso en Auditoría | | | |
 | OQ-B12 | URS-13 | En Trazabilidad busque el lote `OQ-MP-01` y luego el lote terminado | Muestra el lote terminado que lo usó, y al revés, sus materias primas | | | |
-| OQ-B13 | URS-14 | Con el usuario de la app en la base, intente `UPDATE` y `DELETE` sobre `batch_events` y `audit_log` (ver DEPLOY.md, verificación de seguridad) | `permission denied` en ambos | | | |
+| OQ-B13 | URS-14 | Con el usuario de la app en la base, intente `UPDATE` y `DELETE` sobre `batch_events` y `audit_log` (ver manual de administrador, sección 9) | `permission denied` en ambos | | | |
 | OQ-B14 | URS-15, 16 | Descargue el batch record PDF de la orden y el reporte BPM del período | El PDF y el reporte contienen exactamente los pesajes, firmas, resultados y desviaciones registrados | | | |
 | OQ-B15 | URS-17 | Calidad crea un SOP, adjunta su PDF; director lo aprueba con reautenticación; un operario confirma la lectura | El SOP pasa a Vigente, la versión anterior a Obsoleto, el PDF ya no se puede cambiar y calidad ve al operario como "Leído" | | | |
 | OQ-B16 | URS-19 | `docker compose exec backup sh /scripts/restore-test.sh` | `Restauración verificada` | | | |

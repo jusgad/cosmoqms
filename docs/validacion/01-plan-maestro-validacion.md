@@ -101,7 +101,7 @@ El sistema se libera para uso BPM cuando:
 - La matriz de trazabilidad muestra cada requisito cubierto por al menos una prueba aprobada.
 - Están aprobados y capacitados el
   [procedimiento de firma electrónica](../procedimientos/SOP-SIS-001-firma-electronica.md)
-  y el [manual de usuario](../manual/manual-de-usuario.md).
+  y el [manual de usuario](../01-manual-de-usuario.md).
 
 ## 9. Mantenimiento del estado validado
 

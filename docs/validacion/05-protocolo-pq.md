@@ -10,7 +10,7 @@ produce registros BPM completos, exactos y consistentes de forma repetible.
 ## 2. Prerrequisitos
 
 - IQ y OQ aprobadas.
-- Personal capacitado en el [manual de usuario](../manual/manual-de-usuario.md)
+- Personal capacitado en el [manual de usuario](../01-manual-de-usuario.md)
   y en el [procedimiento de firma electrónica](../procedimientos/SOP-SIS-001-firma-electronica.md),
   con registro de capacitación firmado.
 - Durante la PQ el laboratorio mantiene en paralelo su registro en papel

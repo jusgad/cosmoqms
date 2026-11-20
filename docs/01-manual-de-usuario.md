@@ -1,7 +1,7 @@
 # Manual de usuario de CosmoQMS
 
 Versión 1.0 · Para todo el personal. Antes de firmar en el sistema lea también
-el [procedimiento de firma electrónica (SOP-SIS-001)](../procedimientos/SOP-SIS-001-firma-electronica.md).
+el [procedimiento de firma electrónica (SOP-SIS-001)](procedimientos/SOP-SIS-001-firma-electronica.md).
 
 ## Contenido
 

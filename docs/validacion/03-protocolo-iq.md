@@ -5,7 +5,7 @@ Versión 1.0 · Requisitos: [URS](02-requisitos-de-usuario.md) · Plan: [VAL-PMV
 ## 1. Objetivo
 
 Verificar que CosmoQMS quedó instalado en el servidor de producción según
-[DEPLOY.md](../../DEPLOY.md), con su base de datos protegida, sus respaldos
+el [manual de administrador](../05-manual-de-administrador.md), con su base de datos protegida, sus respaldos
 funcionando y sin modo demo.
 
 ## 2. Prerrequisitos
