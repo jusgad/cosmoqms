@@ -164,7 +164,7 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 
 | Control | Alcance |
 |---|---|
-| Pruebas unitarias (Vitest) | 54 archivos, 372 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor, especificaciones de calidad, versionado de fórmulas, inventario y vencimientos, batch record, etiquetas, revisión de accesos, pendientes y acciones rápidas por rol y matriz de permisos |
+| Pruebas unitarias (Vitest) | 55 archivos, 376 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor, especificaciones de calidad, versionado de fórmulas, inventario y vencimientos, batch record, etiquetas, revisión de accesos, pendientes y acciones rápidas por rol y matriz de permisos |
 | Pruebas E2E (Playwright) | 42 pruebas con navegador real contra Docker: flujo BPM completo, permisos de los 6 roles en escritorio y celular, SOPs, usuarios, API y reportes |
 | Integración continua | En cada cambio: lint, tipos, pruebas, build, migraciones en una base vacía y verificación de seguridad de la base |
 | Validación | Paquete IQ/OQ/PQ en [validacion/](validacion/01-plan-maestro-validacion.md) |
@@ -174,6 +174,9 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 - El PDF necesita Chromium: funciona en la imagen Docker, no en funciones *serverless* (por ejemplo Vercel).
 - La firma con reautenticación real solo se prueba con cuentas reales de Clerk (caso manual de la OQ).
 - Una empresa por instalación en la interfaz actual; el modelo de datos ya es multiempresa.
+- El plan gratis de Clerk admite 5 personas por organización. Con la organización llena, el webhook
+  registra el motivo en el log ("límite de miembros de Clerk") y **Usuarios** lo advierte; para más
+  personas hay que liberar cupos o ampliar el plan.
 - Las reglas de negocio fijas (tolerancia de fórmula 100% ± 0,5%, flujo de firma) se cambian solo por control de cambios, no desde la configuración.
 
 ## 11. Datos de demostración en una organización real

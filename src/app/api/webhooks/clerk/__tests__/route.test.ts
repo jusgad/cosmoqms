@@ -97,6 +97,27 @@ describe("POST /api/webhooks/clerk — single-company auto-provisioning", () => 
     });
   });
 
+  it("acknowledges a signup the full organization cannot take, and logs why", async () => {
+    getOrganizationList.mockResolvedValue({ data: [{ id: "org_existing", name: "CosmoQMS" }] });
+    createOrganizationMembership.mockRejectedValue({
+      errors: [{ code: "organization_membership_quota_exceeded", message: "quota exceeded" }],
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const res = await POST(userCreatedRequest(undefined));
+
+    // Retrying cannot free a seat, so Clerk must not keep redelivering it.
+    expect(res.status).toBe(200);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("límite de miembros de Clerk"));
+    log.mockRestore();
+  });
+
+  it("still fails loudly on any other Clerk error so the event is retried", async () => {
+    getOrganizationList.mockResolvedValue({ data: [{ id: "org_existing", name: "CosmoQMS" }] });
+    createOrganizationMembership.mockRejectedValue(new Error("network down"));
+    await expect(POST(userCreatedRequest(undefined))).rejects.toThrow("network down");
+  });
+
   it("reuses the existing organization for every subsequent signup instead of creating a second one", async () => {
     getOrganizationList.mockResolvedValue({ data: [{ id: "org_existing", name: "CosmoQMS" }] });
     createOrganizationMembership.mockResolvedValue({});

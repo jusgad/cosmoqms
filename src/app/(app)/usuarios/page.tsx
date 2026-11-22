@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { listUsers } from "@/lib/users/admin";
+import { loadSeats, seatsLeft } from "@/lib/users/clerkSeats";
 import { ROLE_LABELS } from "@/lib/validation/users";
 import { UserAccessControls } from "@/app/(app)/usuarios/UserAccessControls";
 
@@ -23,6 +24,8 @@ export default async function UsuariosPage() {
 
   const users = await withTenant(user.tenantId, user.id, (tx) => listUsers(tx, user.tenantId));
   const activeCount = users.filter((row) => row.active).length;
+  const seats = await loadSeats(user.tenantId);
+  const left = seats ? seatsLeft(seats) : null;
 
   return (
     <div className="flex max-w-4xl flex-col gap-4">
@@ -39,6 +42,21 @@ export default async function UsuariosPage() {
           Operario. Cada cambio de rol o de estado queda en la auditoría.
         </p>
       </div>
+
+      {seats && left !== null && (
+        <p
+          role="status"
+          className={cn(
+            "rounded-card border p-3 text-sm",
+            left === 0 ? "border-pending bg-pending/10 text-foreground" : "border-border bg-card text-muted-foreground",
+          )}
+        >
+          Cupos en Clerk: {seats.used} de {seats.max} usados.{" "}
+          {left === 0
+            ? "La organización está llena: una persona nueva no podrá entrar hasta liberar un cupo. Desactive aquí a quien ya no trabaja y sáquelo de la organización en el panel de Clerk (Organizations → Members), o amplíe el plan."
+            : `Quedan ${left} para personas nuevas.`}
+        </p>
+      )}
 
       {users.length === 0 ? (
         <div className="rounded-card border border-border bg-card p-6 text-sm text-muted-foreground">

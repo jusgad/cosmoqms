@@ -3,6 +3,7 @@ import { Webhook } from "svix";
 import { withTenant } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { clerkClient } from "@clerk/nextjs/server";
+import { isMembershipQuotaError } from "@/lib/users/clerkSeats";
 import type {
   OrganizationJSON,
   OrganizationMembershipJSON,
@@ -143,11 +144,25 @@ async function handleUserCreated(data: UserJSON): Promise<void> {
 
   const client = await clerkClient();
   const organization = await getOrCreateDefaultOrganization(data.id);
-  await client.organizations.createOrganizationMembership({
-    organizationId: organization.id,
-    userId: data.id,
-    role: DEFAULT_CLERK_MEMBERSHIP_ROLE,
-  });
+  try {
+    await client.organizations.createOrganizationMembership({
+      organizationId: organization.id,
+      userId: data.id,
+      role: DEFAULT_CLERK_MEMBERSHIP_ROLE,
+    });
+  } catch (error) {
+    // The organization is full (Clerk plan limit). Retrying cannot help, so
+    // acknowledge the event and leave a clear trace for the administrator:
+    // free a seat in Clerk and add this person to the organization there.
+    if (isMembershipQuotaError(error)) {
+      const email = data.email_addresses?.[0]?.email_address ?? data.id;
+      console.error(
+        `[clerk-webhook] ${email} no se pudo agregar a "${organization.name}": la organización alcanzó el límite de miembros de Clerk. Libere un cupo y agréguelo desde el panel de Clerk.`,
+      );
+      return;
+    }
+    throw error;
+  }
 }
 
 async function handleMembershipUpdated(membership: OrganizationMembershipJSON): Promise<void> {

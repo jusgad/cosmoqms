@@ -258,7 +258,7 @@ cambio, el laboratorio asume la operación (ver
 | Atributo | Decisión |
 |---|---|
 | Mantenibilidad | Un módulo por dominio, sin imports cruzados entre routers; componentes de máximo 300 líneas; TypeScript estricto sin `any` |
-| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 372 pruebas unitarias y 42 E2E |
+| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 376 pruebas unitarias y 42 E2E |
 | Disponibilidad | Healthchecks y reinicio automático de contenedores; monitor externo |
 | Rendimiento | Paginación en el servidor (25 por página, 50 en auditoría); índices por `tenant_id` |
 | Usabilidad en planta | Diseño mobile-first, botones de al menos 44 px, PWA instalable |

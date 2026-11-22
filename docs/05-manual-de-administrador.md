@@ -135,6 +135,7 @@ archivo de evidencia que genera el script.
 | Baja o retiro | **Usuarios** → **Desactivar** (el acceso se corta de inmediato) |
 | Reactivar | **Usuarios** → **Reactivar** |
 | Verificar MFA | **Usuarios** muestra "MFA activo" en cada cuenta que lo tiene |
+| Cupos de Clerk | **Usuarios** muestra cuántos cupos de la organización están usados. El plan gratis de Clerk permite 5 personas por organización (miembros más invitaciones pendientes) |
 | Consultar qué hace cada rol | **Roles y permisos**: matriz de acciones por rol y personas activas por rol |
 | Revisión de accesos | **Usuarios** → **Revisión de accesos**: hallazgos (sin MFA, nunca ingresó, más de 90 días sin ingresar) y CSV como evidencia |
 | Ver el historial | **Auditoría** → tabla `User` |
@@ -143,6 +144,12 @@ Reglas:
 
 - Asigne el rol que corresponde al cargo aprobado por el jefe del área.
 - Desactive la cuenta **el mismo día** en que alguien se retira o cambia de funciones.
+- Si la organización está llena, una persona nueva ve en Clerk la pantalla "Set up your organization"
+  y no entra a CosmoQMS (no debe crear una organización ahí). Para darle cupo: desactive en **Usuarios**
+  a quien ya no trabaja, sáquelo de la organización en el panel de Clerk (**Organizations → Members**) y
+  agregue a la persona nueva desde ese mismo panel; el webhook la crea en CosmoQMS como Operario y usted
+  le asigna el rol. Con más de 5 personas, amplíe el plan de Clerk. La cuenta desactivada se conserva
+  en CosmoQMS porque su historial es parte de la auditoría.
 - Nadie cambia su propio acceso: un administrador no puede modificar su
   propia cuenta, lo hace otro administrador. Mantenga al menos dos administradores.
 - Por separación de funciones el administrador ve todos los módulos solo en **modo supervisión** (lectura):

@@ -43,6 +43,7 @@ el [manual de administrador](05-manual-de-administrador.md).
 - [ ] Datos de la empresa cargados en **Configuración**: razón social, NIT y registro INVIMA ([§5](05-manual-de-administrador.md#5-datos-de-la-empresa))
 - [ ] Usuarios del personal creados con su rol en **Usuarios**, con MFA activo para quienes firman ([§4](05-manual-de-administrador.md#4-usuarios-y-accesos))
 - [ ] Cada persona que firma leyó y aceptó el [SOP-SIS-001 · Uso de la firma electrónica](procedimientos/SOP-SIS-001-firma-electronica.md)
+- [ ] El plan de Clerk admite a todo el personal (el gratis permite 5 personas por organización; **Usuarios** muestra los cupos)
 - [ ] Catálogo de materias primas cargado por bodega en **Materias Primas → Catálogo**
 - [ ] Fórmulas maestras creadas, con sus especificaciones de calidad, y activadas por calidad
 - [ ] Impresora de etiquetas de 100 × 70 mm probada con **Imprimir etiqueta con QR**

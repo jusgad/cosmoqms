@@ -345,6 +345,8 @@ le aparecen y el servidor rechaza esas acciones si las intenta.
    pérdida de credenciales); **Reactivar** lo devuelve.
 4. Usted no puede cambiar su propio acceso: lo hace otro administrador.
 5. Cada cambio queda en **Auditoría** (tabla User).
+6. Arriba aparecen los **cupos de Clerk** usados. Si la organización está llena, una persona nueva no
+   puede entrar: siga el manual de administrador (§4) para liberar un cupo.
 
 ### Roles y permisos
 
