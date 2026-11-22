@@ -40,9 +40,13 @@ el [manual de administrador](05-manual-de-administrador.md).
 ## 4. Puesta en marcha
 
 - [ ] Primer administrador creado ([§3.5](05-manual-de-administrador.md#35-primer-administrador))
-- [ ] Datos de la empresa cargados en **Configuración**: razón social, NIT, logo y tolerancias ([§5](05-manual-de-administrador.md#5-datos-de-la-empresa))
+- [ ] Datos de la empresa cargados en **Configuración**: razón social, NIT y registro INVIMA ([§5](05-manual-de-administrador.md#5-datos-de-la-empresa))
 - [ ] Usuarios del personal creados con su rol en **Usuarios**, con MFA activo para quienes firman ([§4](05-manual-de-administrador.md#4-usuarios-y-accesos))
 - [ ] Cada persona que firma leyó y aceptó el [SOP-SIS-001 · Uso de la firma electrónica](procedimientos/SOP-SIS-001-firma-electronica.md)
+- [ ] Catálogo de materias primas cargado por bodega en **Materias Primas → Catálogo**
+- [ ] Fórmulas maestras creadas, con sus especificaciones de calidad, y activadas por calidad
+- [ ] Impresora de etiquetas de 100 × 70 mm probada con **Imprimir etiqueta con QR**
+- [ ] Primera revisión de accesos hecha y su CSV archivado (**Usuarios → Revisión de accesos**)
 
 ## 5. Respaldos y monitoreo
 

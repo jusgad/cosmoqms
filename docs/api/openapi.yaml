@@ -218,6 +218,22 @@ paths:
         "401": { $ref: "#/components/responses/SinSesion" }
         "403": { $ref: "#/components/responses/SinPermiso" }
 
+  /api/reports/accesos:
+    get:
+      tags: [Reportes]
+      summary: Revisión periódica de accesos en CSV
+      description: |
+        Cada cuenta con su rol, estado, MFA, último ingreso (consultado en
+        Clerk) y hallazgos: sin MFA, nunca ha ingresado o sin ingresar hace más
+        de 90 días. Solo administrador.
+      responses:
+        "200":
+          description: CSV separado por punto y coma, con BOM para Excel.
+          content:
+            text/csv: { schema: { type: string } }
+        "401": { $ref: "#/components/responses/SinSesion" }
+        "403": { $ref: "#/components/responses/SinPermiso" }
+
   /api/pdf/batch/{id}:
     get:
       tags: [Registros de lote]
@@ -226,12 +242,33 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid }, description: Id de la orden de producción }
       responses:
         "200":
-          description: El batch record con eventos, firmas y resultados de QC.
+          description: |
+            El batch record con encabezado de la empresa, fórmula y versión,
+            pesajes con el lote de materia prima usado, firmas electrónicas con
+            el nombre de quien firmó, resultados de QC contra su
+            especificación, desviaciones con su CAPA y el historial de eventos.
+            Roles: calidad, director_tecnico y admin (solo lectura).
           content:
             application/pdf: { schema: { type: string, format: binary } }
         "401": { description: Sin sesión. }
         "403": { description: Rol sin acceso. }
         "404": { description: La orden no existe en su empresa. }
+
+  /api/pdf/lot-label/{id}:
+    get:
+      tags: [Registros de lote]
+      summary: Etiqueta de un lote de materia prima con su QR interno
+      description: Etiqueta de 100 x 70 mm para impresora térmica. Roles bodega y calidad.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid }, description: Id del lote de materia prima }
+      responses:
+        "200":
+          description: La etiqueta en PDF con el QR, la materia prima, el lote del proveedor, el estado y el vencimiento.
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+        "401": { description: Sin sesión. }
+        "403": { description: Rol sin acceso. }
+        "404": { description: El lote no existe en su empresa. }
 
   /api/attachments:
     post:

@@ -120,9 +120,13 @@ Estas reglas protegen el cumplimiento BPM. Un cambio que rompa una no se acepta.
    sus cambios importan para BPM, escriba `audit_log` explícitamente.
 5. **Procedimiento:** en el router del dominio, con `roleProcedure(...roles)` y `tenantTx`.
 6. **Pantalla:** página en `src/app/(app)/<modulo>/` que empieza con
-   `requirePageRole(...)` (agregue el módulo a `MODULE_ROLES` en
-   `src/lib/pageAccess.ts`) y, si va en el menú, la entrada en `Sidebar.tsx`
-   con los mismos roles.
+   `requirePageRole(MODULE_ROLES.<modulo>)`. Los roles de cada módulo viven en
+   un solo lugar, `src/lib/roles/modules.ts`, que usan también el menú
+   (`Sidebar.tsx`, que solo lista la entrada) y la pantalla de roles. El
+   administrador abre los módulos en solo lectura: nunca lo agregue a un
+   procedimiento que pese, firme, libere, apruebe o reciba, y anote la acción
+   nueva en `src/lib/roles/permissions.ts` (la prueba `modules.test.ts` vigila
+   la separación de funciones).
 7. **Pruebas:** unitarias del servicio y del router (permisos, empresa ajena,
    reglas) y, si es un flujo de usuario, una prueba E2E.
 8. **Documentación:** manual de usuario y, si cambia un requisito, la URS y la

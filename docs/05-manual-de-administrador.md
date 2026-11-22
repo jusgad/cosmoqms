@@ -135,6 +135,8 @@ archivo de evidencia que genera el script.
 | Baja o retiro | **Usuarios** → **Desactivar** (el acceso se corta de inmediato) |
 | Reactivar | **Usuarios** → **Reactivar** |
 | Verificar MFA | **Usuarios** muestra "MFA activo" en cada cuenta que lo tiene |
+| Consultar qué hace cada rol | **Roles y permisos**: matriz de acciones por rol y personas activas por rol |
+| Revisión de accesos | **Usuarios** → **Revisión de accesos**: hallazgos (sin MFA, nunca ingresó, más de 90 días sin ingresar) y CSV como evidencia |
 | Ver el historial | **Auditoría** → tabla `User` |
 
 Reglas:
@@ -143,7 +145,8 @@ Reglas:
 - Desactive la cuenta **el mismo día** en que alguien se retira o cambia de funciones.
 - Nadie cambia su propio acceso: un administrador no puede modificar su
   propia cuenta, lo hace otro administrador. Mantenga al menos dos administradores.
-- Por separación de funciones el administrador no ve Producción ni Calidad y no firma lotes.
+- Por separación de funciones el administrador ve todos los módulos solo en **modo supervisión** (lectura):
+  no recibe lotes, no pesa, no firma, no libera y no aprueba. El servidor rechaza esas acciones para el rol admin.
 - Las contraseñas y el MFA los gestiona cada persona en Clerk. Para bloquear
   una cuenta comprometida, desactívela en **Usuarios** y, si es necesario,
   bloquéela también en el panel de Clerk.
@@ -264,7 +267,7 @@ respaldo de antes de actualizar.
 | Diaria | Revisar `docker compose ps` y que la copia externa de respaldos se haya hecho |
 | Semanal | Revisar avisos del monitor externo y de Sentry |
 | Mensual | Revisar espacio en disco (`df -h`) |
-| Trimestral | Simulacro de restauración (6.3) con evidencia; revisión de accesos con Calidad: retirados desactivados, MFA en calidad, director técnico y administrador |
+| Trimestral | Simulacro de restauración (6.3) con evidencia; revisión de accesos con Calidad en **Usuarios → Revisión de accesos** (guardar el CSV): retirados desactivados, MFA en calidad, director técnico y administrador |
 | Anual | Revisión periódica de la validación con Calidad; renovar contraseñas de la base |
 
 ## 11. Solución de problemas

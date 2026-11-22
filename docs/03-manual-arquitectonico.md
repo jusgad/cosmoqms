@@ -212,7 +212,29 @@ credenciales. Un webhook firmado (Svix) crea los usuarios y sincroniza el
 estado de MFA. El **rol** y el estado activo los decide CosmoQMS (pantalla
 Usuarios, con auditoría): el webhook nunca los sobrescribe.
 
-### 6.8 Base de datos propia
+### 6.8 Roles en un solo lugar y modo supervisión
+
+Qué rol abre cada módulo está definido una sola vez, en
+`src/lib/roles/modules.ts`; lo usan el menú y la puerta de cada página, así
+que nunca se contradicen. Abrir un módulo no da permiso para actuar en él:
+cada acción tiene su propio `roleProcedure` en el servidor. El administrador
+abre todos los módulos en **modo supervisión** (solo lectura) y ningún
+procedimiento de pesaje, firma, liberación, aprobación o recepción lo admite:
+quien administra el sistema no aprueba lotes. La pantalla **Roles y permisos**
+documenta la matriz (`src/lib/roles/permissions.ts`), y una prueba verifica que
+el administrador nunca aparezca en una acción de ese tipo.
+
+### 6.9 Control de cambios de fórmulas e inventario
+
+Una fórmula activa no se edita: se crea la versión N+1 como borrador (copia de
+ingredientes y especificaciones) y al activarla la versión N queda archivada en
+la misma transacción. Las órdenes guardan la versión con la que se hicieron. El
+pesaje descuenta el inventario del lote con una escritura condicionada
+(`quantity_available >= pesado`) y rechaza lotes vencidos o sin liberar; las
+mismas reglas (`src/lib/materials/lotAvailability.ts`) filtran lo que ve el
+operario.
+
+### 6.10 Base de datos propia
 
 PostgreSQL en el mismo servidor, sin proveedor administrado: los registros BPM
 quedan bajo control del laboratorio, con respaldos propios verificados. A
@@ -236,7 +258,7 @@ cambio, el laboratorio asume la operación (ver
 | Atributo | Decisión |
 |---|---|
 | Mantenibilidad | Un módulo por dominio, sin imports cruzados entre routers; componentes de máximo 300 líneas; TypeScript estricto sin `any` |
-| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 315 pruebas unitarias y 42 E2E |
+| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 372 pruebas unitarias y 42 E2E |
 | Disponibilidad | Healthchecks y reinicio automático de contenedores; monitor externo |
 | Rendimiento | Paginación en el servidor (25 por página, 50 en auditoría); índices por `tenant_id` |
 | Usabilidad en planta | Diseño mobile-first, botones de al menos 44 px, PWA instalable |
@@ -246,5 +268,6 @@ cambio, el laboratorio asume la operación (ver
 
 - Habilitar varias empresas en la interfaz (el modelo y la RLS ya lo soportan).
 - Ampliar la API REST v1 a más módulos, con el mismo contrato OpenAPI y pruebas.
+- Conectar las balanzas de la planta para que el peso entre sin digitarse.
 - Toda evolución pasa por control de cambios y por la validación afectada
   ([plan maestro](validacion/01-plan-maestro-validacion.md)).

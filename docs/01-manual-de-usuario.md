@@ -29,13 +29,13 @@ Su cuenta es personal. Nunca entre con la cuenta de otra persona ni comparta la 
 ### El menú
 
 El menú de la izquierda (arriba en el celular) muestra solo los módulos de su
-rol. Si escribe la dirección de un módulo que no le corresponde, el sistema lo
+rol. El administrador los ve todos, en solo lectura. Si escribe la dirección de un módulo que no le corresponde, el sistema lo
 devuelve al Dashboard.
 
 | Módulo | Para qué |
 |---|---|
 | Dashboard | Indicadores: lotes en curso, liberados, desviaciones abiertas, conformidad de QC |
-| Materias Primas | Lotes recibidos, cuarentena, liberación, certificados (COA) |
+| Materias Primas | Catálogo de materias primas, lotes recibidos, cuarentena, liberación, certificados (COA) |
 | Fórmulas | Fórmulas maestras y su activación |
 | Producción | Tablero de órdenes por etapa |
 | Calidad | Resultados de QC pendientes y desviaciones |
@@ -43,7 +43,7 @@ devuelve al Dashboard.
 | Reportes | Reporte BPM en PDF o Excel |
 | SOPs | Procedimientos vigentes y confirmación de lectura |
 | Auditoría | Historial de cambios (quién, qué, cuándo) |
-| Usuarios / Configuración | Administración (solo administrador) |
+| Usuarios / Roles y permisos / Configuración | Administración (solo administrador) |
 
 ### Trabajar sin señal
 
@@ -54,10 +54,24 @@ dispositivo y se envían solos cuando vuelve la señal.
 - No cierre sesión ni borre los datos del navegador mientras haya pendientes.
 - Cada pesaje se aplica una sola vez, aunque el envío se repita.
 
+### Acciones rápidas
+
+Arriba del **Dashboard** están los botones de lo que más hace su rol: por ejemplo, **Recibir lote** para bodega, **Nueva orden** para el jefe de planta, **Control de calidad** para calidad o **Lotes por liberar** para el director técnico. Las tarjetas de indicadores también son enlaces: al tocarlas abre la lista que hay detrás del número, si su rol puede verla.
+
+### Mis pendientes
+
+En el **Dashboard**, el recuadro **Mis pendientes** muestra lo que espera por
+su rol, con un enlace a donde se hace: por ejemplo, al operario las órdenes por
+pesar; a calidad los lotes en cuarentena y las órdenes por analizar; al
+director técnico los lotes listos para liberar. Si dice "Todo al día", no tiene
+nada pendiente.
+
 ### Notificaciones
 
 La campana de arriba muestra avisos: desviaciones nuevas, desviaciones listas
-para aprobar y resultados de QC fuera de especificación. Pulse **Ver detalle**
+para aprobar, resultados de QC fuera de especificación, lotes de materia prima
+recibidos en cuarentena (a calidad), órdenes listas para control de calidad
+(a calidad) y lotes listos para liberar (al director técnico). Pulse **Ver detalle**
 para ir al registro, y **Marcar como leída** cuando lo haya atendido.
 
 ### Firmar
@@ -77,12 +91,16 @@ si se equivocó, avise a su jefe para registrar una desviación.
 2. Pulse **Registrar pesaje**.
 3. Elija el lote de materia prima: pulse **Escanear** y apunte al QR del lote,
    o escriba en el buscador el nombre o código y pulse el lote.
-   Solo aparecen lotes **liberados** por calidad.
+   Solo aparecen lotes **liberados** por calidad, **sin vencer**, **con
+   existencias** y de una materia prima de la fórmula. Cada lote muestra cuánto
+   tiene disponible y cuándo vence.
 4. Revise la **Cantidad teórica** que calcula el sistema.
 5. Escriba la **Cantidad pesada**. El indicador de tolerancia se pone en verde,
    amarillo o rojo según la diferencia con la teórica.
 6. Pulse **Registrar pesaje**. Repita por cada ingrediente; el botón dice
-   cuántos faltan.
+   cuántos faltan. El pesaje se descuenta del lote. Si el lote no alcanza, el
+   sistema no deja registrar más de lo disponible: complete con otro lote de
+   la misma materia prima.
 
 ### Firmar una etapa
 
@@ -122,6 +140,23 @@ Hace todo lo del operario y además:
    El total debe dar **100% ± 0,5%** (se pone en verde).
 4. **Guardar fórmula**. Queda en **Borrador** hasta que calidad la active.
 
+### Corregir una fórmula en borrador
+
+Abra la fórmula en **Borrador**. En **Ingredientes (borrador editable)** puede
+cambiar el porcentaje (escríbalo y pulse Enter), quitar un ingrediente con la
+papelera o agregar otro. El total se pone en verde al llegar a 100 % ± 0,5 %.
+
+### Crear una nueva versión de una fórmula activa
+
+Una fórmula activa no se modifica. Para cambiarla:
+
+1. Abra la fórmula **Activa** y pulse **Crear versión N**. El sistema copia los
+   ingredientes y las especificaciones en un borrador nuevo.
+2. Ajuste el borrador y avise a calidad.
+3. Cuando calidad activa la nueva versión, la anterior queda **Archivada**. Las
+   órdenes ya creadas conservan la versión con la que se hicieron, y el
+   **Historial de versiones** de la fórmula muestra todas.
+
 ### Programar una orden de producción
 
 1. **Producción** → **Nueva orden**.
@@ -131,6 +166,21 @@ Hace todo lo del operario y además:
 ---
 
 ## 4. Bodega
+
+### Mantener el catálogo de materias primas
+
+El catálogo dice qué materias primas existen en el laboratorio. Una materia
+prima tiene que estar en el catálogo antes de recibir un lote de ella o de
+usarla en una fórmula.
+
+1. **Materias Primas** → **Catálogo**.
+2. En **Nueva materia prima** escriba el código (por ejemplo `MP-006`), el
+   nombre, la unidad y, si quiere, la categoría. Pulse **Agregar**.
+3. Para corregir el nombre, la unidad o la categoría, pulse el lápiz de la
+   fila, cambie el dato y pulse **Guardar**. El código no se cambia.
+4. El ícono de la papelera elimina una materia prima creada por error. El
+   sistema no deja eliminar una que ya tiene lotes recibidos o que está en una
+   fórmula, porque hace parte del historial de los lotes.
 
 ### Recibir materia prima
 
@@ -146,8 +196,11 @@ Hace todo lo del operario y además:
    lote del proveedor**, la cantidad y la fecha de vencimiento. Si el resumen dice
    que la materia prima no está en el catálogo, selecciónela a mano.
 4. **Recibir lote**. El lote queda en **Cuarentena** con su QR interno, aunque
-   los datos hayan venido del QR del proveedor: imprímalo y péguelo.
-5. En el lote, adjunte el **certificado de análisis (COA)** en PDF y pulse **Subir**.
+   los datos hayan venido del QR del proveedor. Calidad recibe un aviso.
+5. En el lote, pulse **Imprimir etiqueta con QR**: sale una etiqueta de
+   100 × 70 mm con el QR, la materia prima, el lote del proveedor, el estado y
+   el vencimiento. Péguela en el bulto.
+6. En el lote, adjunte el **certificado de análisis (COA)** en PDF y pulse **Subir**.
 
 Formatos de QR que CosmoQMS entiende:
 
@@ -166,7 +219,10 @@ guarda tal cual en **Código del proveedor**.
 ### Buscar lotes
 
 En **Materias Primas** escriba en el buscador el lote, código o nombre y pulse
-**Buscar**. Los lotes que vencen en menos de 30 días se marcan con un aviso.
+**Buscar**. La tabla muestra el lote del proveedor, el estado, lo **disponible**
+y el vencimiento. Se marcan con aviso los lotes que vencen en menos de 30 días,
+los **vencidos**, los de **stock bajo** (menos del 10 % de lo recibido) y los
+**agotados**.
 
 ---
 
@@ -177,6 +233,22 @@ En **Materias Primas** escriba en el buscador el lote, código o nombre y pulse
 1. **Materias Primas** → abra el lote en **Cuarentena**.
 2. Revise el COA adjunto.
 3. **Liberar lote** o **Rechazar lote**. Solo los liberados se pueden pesar.
+   Un lote vencido no se puede liberar, solo rechazar.
+4. Reimprima la etiqueta (**Imprimir etiqueta con QR**) para que el bulto
+   muestre el estado nuevo.
+
+### Definir las especificaciones de calidad de una fórmula
+
+Las especificaciones son los rangos contra los que se evalúa cada lote (por
+ejemplo, pH entre 5,5 y 7 o viscosidad entre 8.000 y 12.000 cP).
+
+1. Abra la fórmula en **Borrador**.
+2. En **Especificaciones de calidad** escriba el parámetro, el mínimo, el
+   máximo (puede dejar uno de los dos vacío) y la unidad. Pulse **Agregar**.
+3. La papelera de cada fila quita una especificación.
+
+Solo se cambian mientras la fórmula está en borrador: una vez activa, cambiar
+un rango requiere una nueva versión de la fórmula. Defínalas antes de activar.
 
 ### Activar una fórmula
 
@@ -205,6 +277,10 @@ validación de calidad de este lote"*).
 
 ### Trazabilidad y reportes
 
+- **Batch record**: en la orden, **Descargar batch record (PDF)** genera el
+  registro del lote con los datos de la empresa, los pesajes con el lote usado,
+  las firmas con su nombre, el control de calidad contra la especificación y
+  las desviaciones con su CAPA.
 - **Trazabilidad**: elija la dirección de búsqueda, escriba el código de lote
   de materia prima (o de producto terminado) y pulse **Buscar**.
 - **Reportes**: elija el período (**Desde**, **Hasta**) y pulse **Descargar PDF**
@@ -255,8 +331,11 @@ resultado en CSV.
 
 ## 7. Administrador
 
-El administrador gestiona accesos y datos de la empresa. Por separación de
-funciones **no** ve Producción ni Calidad y no firma lotes.
+El administrador gestiona los accesos y los datos de la empresa, y supervisa
+el sistema. Entra a **todos los módulos en modo supervisión (solo lectura)**:
+arriba aparece el aviso "Modo supervisión". Por separación de funciones (BPM)
+**no** recibe lotes, no pesa, no firma, no libera y no aprueba: esos botones no
+le aparecen y el servidor rechaza esas acciones si las intenta.
 
 ### Usuarios
 
@@ -267,11 +346,32 @@ funciones **no** ve Producción ni Calidad y no firma lotes.
 4. Usted no puede cambiar su propio acceso: lo hace otro administrador.
 5. Cada cambio queda en **Auditoría** (tabla User).
 
+### Roles y permisos
+
+**Roles y permisos** muestra qué hace cada rol, cuántas personas activas lo
+tienen y una tabla con cada acción del sistema y los roles que pueden
+hacerla. Es la referencia para decidir qué rol darle a una persona según su
+cargo; el rol se asigna en **Usuarios**. Los permisos de cada rol no se editan
+desde la pantalla: los fija la separación de funciones y los valida el
+servidor en cada acción.
+
+### Revisión de accesos
+
+Hágala al menos cada tres meses y guarde el CSV como evidencia.
+
+1. **Usuarios** → **Revisión de accesos**.
+2. La tabla muestra cada cuenta con su rol, estado, MFA y último ingreso, y
+   marca los hallazgos: cuenta activa **sin MFA**, que **nunca ha ingresado** o
+   que **no ingresa hace más de 90 días**, y administrador sin MFA.
+3. Corrija cada hallazgo: desactive a quien ya no trabaja en el laboratorio,
+   ajuste el rol o pida a la persona que active el MFA.
+4. **Descargar CSV** guarda la revisión con la fecha y su nombre.
+
 ### Configuración
 
 **Configuración** guarda la razón social, el NIT y el registro INVIMA que
-aparecen en el reporte BPM y en los registros de lote. Pulse **Guardar**; el
-cambio queda en la auditoría.
+aparecen en el reporte BPM, en el batch record y en las etiquetas. Pulse
+**Guardar**; el cambio queda en la auditoría.
 
 ---
 
@@ -280,7 +380,7 @@ cambio queda en la auditoría.
 | Situación | Qué hacer |
 |---|---|
 | "Sin acceso a CosmoQMS" | Su cuenta está desactivada o recién creada. Espere unos segundos y pulse **Intentar de nuevo**; si sigue, avise al administrador |
-| No aparece el lote para pesar | El lote no está liberado o es de otra materia prima de la fórmula. Avise a calidad |
+| No aparece el lote para pesar | El lote no está liberado, está vencido, se agotó o no es de una materia prima de la fórmula. Avise a calidad o a bodega |
 | El botón **Firmar** no se activa | Falta **Verificar identidad**, o en la etapa pesado faltan ingredientes por pesar |
 | El indicador dice que hay eventos pendientes | No tiene señal. Siga trabajando; se envían solos al reconectar. No cierre sesión |
 | No ve un módulo | Su rol no lo incluye. Si lo necesita para su trabajo, pídalo a su jefe y al administrador |

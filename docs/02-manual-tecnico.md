@@ -33,6 +33,7 @@ tableta y celular, se puede instalar como app y sigue registrando pesajes sin se
 | Identidad, sesiones y MFA | Clerk (Organizations) | @clerk/nextjs 7 |
 | Modo sin conexión | Serwist (service worker) + Dexie (IndexedDB) | 9 / 4 |
 | Generación de PDF | Playwright (Chromium sin interfaz) | 1.63 |
+| Códigos QR de las etiquetas | qrcode (SVG en el servidor) | 1.5 |
 | Almacenamiento de adjuntos | Disco local o S3 compatible (AWS SDK v3) | — |
 | Correo | Resend (API HTTP) | — |
 | Monitoreo de errores | Sentry | @sentry/nextjs 11 |
@@ -105,8 +106,8 @@ Fuente de verdad: `prisma/schema.prisma`. Todas las tablas de negocio tienen
 | Área | Tablas | Notas |
 |---|---|---|
 | Empresa y personas | `organizations`, `users` | El rol vive en `users.role`; `active` corta el acceso |
-| Materias primas | `raw_materials`, `raw_material_lots` | Lote: cuarentena → liberado / rechazado; QR interno único |
-| Fórmulas | `master_formulas`, `formula_ingredients` | Versión; borrador → activa solo si suma 100% ± 0,5% |
+| Materias primas | `raw_materials`, `raw_material_lots` | Lote: cuarentena → liberado / rechazado; QR interno único; el pesaje descuenta `quantity_available`; un lote vencido no se libera ni se pesa |
+| Fórmulas | `master_formulas`, `formula_ingredients` | Versión; borrador → activa solo si suma 100% ± 0,5%; al activar la versión N+1 la N queda archivada |
 | Producción | `production_orders`, `batch_events`, `batch_signatures` | Eventos *append-only*; una firma por etapa y orden |
 | Calidad | `qc_specifications`, `qc_results`, `deviations`, `finished_product_lots` | Veredicto calculado en el servidor |
 | Documentos | `sops`, `sop_acknowledgments` | Borrador → vigente → obsoleto; una lectura por persona y versión |
@@ -127,7 +128,7 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 | Aplicación web | Personal del laboratorio | [Manual de usuario](01-manual-de-usuario.md) |
 | API REST `/api/v1` | Integraciones (catálogo de materias primas) | [OpenAPI 3.1](api/openapi.yaml) |
 | `/api/health` | Monitores de disponibilidad (pública) | OpenAPI |
-| `/api/reports/produccion`, `/api/pdf/batch/{id}`, `/api/attachments` | Reportes, batch record y adjuntos | OpenAPI |
+| `/api/reports/produccion`, `/api/reports/accesos`, `/api/pdf/batch/{id}`, `/api/pdf/lot-label/{id}`, `/api/attachments` | Reporte BPM, revisión de accesos, batch record, etiqueta con QR y adjuntos | OpenAPI |
 | `/api/trpc/*` | Interna, solo la usa la interfaz | — |
 | `/api/sync/events` | Interna, sincronización del modo sin conexión | — |
 | `/api/webhooks/clerk` | Entrada de eventos de Clerk (firmados con Svix) | — |
@@ -137,7 +138,9 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 | Mecanismo | Implementación |
 |---|---|
 | Autenticación | Clerk: sesión en cookie, MFA con aplicación autenticadora |
-| Autorización por rol | Seis roles; cada página (`requirePageRole`), procedimiento tRPC (`roleProcedure`) y ruta REST valida el rol en el servidor |
+| Autorización por rol | Seis roles. Qué rol abre cada módulo está en un solo lugar (`src/lib/roles/modules.ts`), que usan el menú y las páginas (`requirePageRole`); cada procedimiento tRPC (`roleProcedure`) y ruta REST valida además el rol de la acción en el servidor |
+| Separación de funciones | El administrador abre todos los módulos en modo supervisión (solo lectura); ningún procedimiento de pesaje, firma, liberación, aprobación o recepción lo admite. Pantalla `/roles` con la matriz de permisos (`src/lib/roles/permissions.ts`) |
+| Revisión de accesos | `/usuarios/revision`: rol, MFA y último ingreso (consultado en Clerk) de cada cuenta, con hallazgos y exportación CSV |
 | Aislamiento por empresa | Dos barreras: filtro por `tenant_id` en cada consulta y Row Level Security forzado en las 18 tablas (`db/rls.sql`) |
 | Mínimo privilegio en la base | La app se conecta como `cosmoqms_runtime`: sin superusuario, sin BYPASSRLS, sin ser dueño, sin `UPDATE`/`DELETE` en `batch_events`, `audit_log` y `attachments` |
 | Audit trail | Extensión de Prisma que escribe `audit_log` (antes/después, usuario, hora) en la misma transacción de cada escritura regulada |
@@ -161,7 +164,7 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 
 | Control | Alcance |
 |---|---|
-| Pruebas unitarias (Vitest) | 44 archivos, 315 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor |
+| Pruebas unitarias (Vitest) | 54 archivos, 372 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor, especificaciones de calidad, versionado de fórmulas, inventario y vencimientos, batch record, etiquetas, revisión de accesos, pendientes y acciones rápidas por rol y matriz de permisos |
 | Pruebas E2E (Playwright) | 42 pruebas con navegador real contra Docker: flujo BPM completo, permisos de los 6 roles en escritorio y celular, SOPs, usuarios, API y reportes |
 | Integración continua | En cada cambio: lint, tipos, pruebas, build, migraciones en una base vacía y verificación de seguridad de la base |
 | Validación | Paquete IQ/OQ/PQ en [validacion/](validacion/01-plan-maestro-validacion.md) |
@@ -172,3 +175,18 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 - La firma con reautenticación real solo se prueba con cuentas reales de Clerk (caso manual de la OQ).
 - Una empresa por instalación en la interfaz actual; el modelo de datos ya es multiempresa.
 - Las reglas de negocio fijas (tolerancia de fórmula 100% ± 0,5%, flujo de firma) se cambian solo por control de cambios, no desde la configuración.
+
+## 11. Datos de demostración en una organización real
+
+`prisma/seed-demo.ts` siembra seis meses de historia (materias primas con sus
+lotes, fórmulas F-001 y F-002 con especificaciones, 14 órdenes, desviaciones y
+SOPs) en `demo-org`. Con la variable `SEED_TENANT_ID` la siembra en una
+organización real de Clerk, para una presentación con usuarios reales: la
+historia queda firmada por cinco usuarios "históricos" inactivos con ids
+propios de esa empresa, que no pueden iniciar sesión, y no se tocan los datos de
+la empresa guardados en Configuración. Se niega a correr con
+`NODE_ENV=production` y no hace nada si la empresa ya tiene órdenes.
+
+```powershell
+docker compose run --rm -T -v "${PWD}\prisma:/app/prisma" -v "${PWD}\src:/app/src" -e SEED_TENANT_ID=org_xxx migrate pnpm exec tsx prisma/seed-demo.ts
+```
