@@ -1,5 +1,5 @@
 /**
- * Demo history for the DEMO_MODE tenant (`demo-org`) — six months of batches
+ * Demo history for the DEMO_MODE tenant (`demo-org`, or SEED_TENANT_ID) — six months of batches
  * so the dashboard, notifications and the BPM report have something real to
  * show in screenshots and in the SENA evidence. Dev/demo databases only.
  *
@@ -19,17 +19,27 @@ import { randomUUID } from "node:crypto";
 import type { BatchStatus, DeviationStatus, Prisma, Role } from "@prisma/client";
 import { prisma, withTenant } from "../src/lib/db";
 
-const TENANT = "demo-org";
-const DEMO_USER = "demo-user";
+// SEED_TENANT_ID seeds a real Clerk organization (e.g. the one used for a
+// recorded walkthrough) instead of `demo-org`. The history is then authored by
+// inactive "former staff" users with ids unique to that tenant, so it never
+// collides with the demo users and none of them can sign in.
+const TENANT = process.env.SEED_TENANT_ID?.trim() || "demo-org";
+const IS_DEMO_TENANT = TENANT === "demo-org";
+const PREFIX = IS_DEMO_TENANT ? "demo" : `hist-${TENANT.slice(-8).toLowerCase()}`;
+const DEMO_USER = IS_DEMO_TENANT ? "demo-user" : `${PREFIX}-director`;
+const CALIDAD = `${PREFIX}-calidad`;
+const JEFE = `${PREFIX}-jefe`;
+const OPERARIO = `${PREFIX}-operario`;
+const BODEGA = `${PREFIX}-bodega`;
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 
 const STAFF: { id: string; role: Role; fullName: string; email: string }[] = [
-  { id: DEMO_USER, role: "director_tecnico", fullName: "Usuario Demo", email: "demo@cosmoqms.local" },
-  { id: "demo-calidad", role: "calidad", fullName: "Beatriz Calidad", email: "calidad@cosmoqms.local" },
-  { id: "demo-jefe", role: "jefe_planta", fullName: "Carlos Jefe de Planta", email: "jefe.planta@cosmoqms.local" },
-  { id: "demo-operario", role: "operario", fullName: "Ana Operaria", email: "operario@cosmoqms.local" },
-  { id: "demo-bodega", role: "bodega", fullName: "Elena Bodega", email: "bodega@cosmoqms.local" },
+  { id: DEMO_USER, role: "director_tecnico", fullName: IS_DEMO_TENANT ? "Usuario Demo" : "Diego Director (histórico)", email: IS_DEMO_TENANT ? "demo@cosmoqms.local" : "director.historico@cosmoqms.local" },
+  { id: CALIDAD, role: "calidad", fullName: "Beatriz Calidad", email: IS_DEMO_TENANT ? "calidad@cosmoqms.local" : "calidad.historico@cosmoqms.local" },
+  { id: JEFE, role: "jefe_planta", fullName: "Carlos Jefe de Planta", email: IS_DEMO_TENANT ? "jefe.planta@cosmoqms.local" : "jefe.historico@cosmoqms.local" },
+  { id: OPERARIO, role: "operario", fullName: "Ana Operaria", email: IS_DEMO_TENANT ? "operario@cosmoqms.local" : "operario.historico@cosmoqms.local" },
+  { id: BODEGA, role: "bodega", fullName: "Elena Bodega", email: IS_DEMO_TENANT ? "bodega@cosmoqms.local" : "bodega.historico@cosmoqms.local" },
 ];
 
 const MATERIALS = [
@@ -122,7 +132,7 @@ async function seedSops(): Promise<void> {
           version: sop.version,
           status: sop.status,
           changeSummary: "change" in sop ? sop.change : null,
-          createdBy: "demo-calidad",
+          createdBy: CALIDAD,
           createdAt: new Date(effectiveDate.getTime() - 7 * DAY),
           approvedBy: DEMO_USER,
           // 10:00 a. m. in Bogotá on the effective date.
@@ -142,20 +152,21 @@ async function main(): Promise<void> {
   await seedSops();
   const existing = await withTenant(TENANT, DEMO_USER, (tx) => tx.productionOrder.count({ where: { tenantId: TENANT } }));
   if (existing > 0) {
-    console.log(`demo-org ya tiene ${existing} órdenes: no se siembra nada.`);
+    console.log(`${TENANT} ya tiene ${existing} órdenes: no se siembra nada.`);
     return;
   }
 
   await withTenant(TENANT, DEMO_USER, async (tx) => {
+    // A real organization keeps whatever its admin saved in /configuracion.
     await tx.organization.upsert({
       where: { id: TENANT },
       create: { id: TENANT, name: "CosmoLab Demo S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-DEMO" },
-      update: { name: "CosmoLab Demo S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-DEMO" },
+      update: IS_DEMO_TENANT ? { name: "CosmoLab Demo S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-DEMO" } : {},
     });
     for (const member of STAFF) {
       await tx.user.upsert({
         where: { id: member.id },
-        create: { ...member, tenantId: TENANT, active: true },
+        create: { ...member, tenantId: TENANT, active: IS_DEMO_TENANT },
         update: { fullName: member.fullName, email: member.email },
       });
     }
@@ -165,7 +176,7 @@ async function main(): Promise<void> {
   const lotByCode = new Map<string, string>();
   const materialByCode = new Map<string, string>();
 
-  await withTenant(TENANT, "demo-bodega", async (tx) => {
+  await withTenant(TENANT, BODEGA, async (tx) => {
     for (const material of MATERIALS) {
       const created = await tx.rawMaterial.create({
         data: { tenantId: TENANT, code: material.code, name: material.name, unit: material.unit, category: material.category },
@@ -189,7 +200,7 @@ async function main(): Promise<void> {
   });
 
   const formulaIds: string[] = [];
-  await withTenant(TENANT, "demo-calidad", async (tx) => {
+  await withTenant(TENANT, CALIDAD, async (tx) => {
     for (const formula of FORMULAS) {
       const created = await tx.masterFormula.create({
         data: {
@@ -223,7 +234,7 @@ async function main(): Promise<void> {
     const planned = new Date(now - plan.daysAgo * DAY);
     const start = new Date(planned.getFullYear(), planned.getMonth(), planned.getDate(), 8, 0, 0, 0);
 
-    await withTenant(TENANT, "demo-jefe", async (tx: Prisma.TransactionClient) => {
+    await withTenant(TENANT, JEFE, async (tx: Prisma.TransactionClient) => {
       const order = await tx.productionOrder.create({
         data: {
           tenantId: TENANT,
@@ -233,7 +244,7 @@ async function main(): Promise<void> {
           plannedQuantity: plan.quantity,
           plannedStart: start,
           status: plan.status,
-          createdBy: "demo-jefe",
+          createdBy: JEFE,
         },
       });
 
@@ -248,7 +259,7 @@ async function main(): Promise<void> {
               theoreticalQty: (percentage / 100) * plan.quantity,
               actualQty: Math.round((percentage / 100) * plan.quantity * 1000) / 1000,
             },
-            actorUserId: "demo-operario",
+            actorUserId: OPERARIO,
             occurredAt: start,
             clientEventId: randomUUID(),
           },
@@ -264,7 +275,7 @@ async function main(): Promise<void> {
         const signedAt = new Date(cursor);
         const finalDecision = stage === "calidad" ? (plan.status === "liberado" || plan.status === "rechazado" ? plan.status : null) : null;
         const signatureStage = finalDecision ?? stage;
-        const signer = stage === "calidad" ? DEMO_USER : "demo-operario";
+        const signer = stage === "calidad" ? DEMO_USER : OPERARIO;
         const signature = await tx.batchSignature.create({
           data: {
             productionOrderId: order.id,
@@ -308,7 +319,7 @@ async function main(): Promise<void> {
             parameter: result.parameter,
             measuredValue: result.value,
             result: spec ? evaluate(result.value, spec) : "pass",
-            recordedBy: "demo-calidad",
+            recordedBy: CALIDAD,
             recordedAt: qcAt,
           },
         });
@@ -323,8 +334,8 @@ async function main(): Promise<void> {
             productionOrderId: order.id,
             description: plan.deviation.description,
             status: plan.deviation.status,
-            raisedBy: "demo-operario",
-            investigationStartedBy: investigating ? "demo-calidad" : null,
+            raisedBy: OPERARIO,
+            investigationStartedBy: investigating ? CALIDAD : null,
             investigationStartedAt: investigating ? new Date(start.getTime() + 6 * HOUR) : null,
             investigation: investigating ? "Revisión del registro de lote, condiciones de proceso y materias primas del lote." : null,
             correctiveAction: investigating ? "Ajuste del procedimiento y reentrenamiento del personal de turno." : null,
@@ -333,7 +344,7 @@ async function main(): Promise<void> {
           },
         });
 
-        if (!closed) {
+        if (!closed && IS_DEMO_TENANT) {
           await tx.notification.create({
             data: {
               tenantId: TENANT,
@@ -355,7 +366,7 @@ async function main(): Promise<void> {
         const spec = formula.specs.find((item) => item.parameter === result.parameter);
         return spec ? evaluate(result.value, spec) === "fail" : false;
       });
-      if (failed && plan.daysAgo <= 10) {
+      if (failed && plan.daysAgo <= 10 && IS_DEMO_TENANT) {
         await tx.notification.create({
           data: {
             tenantId: TENANT,
@@ -371,7 +382,7 @@ async function main(): Promise<void> {
     });
   }
 
-  console.log(`Sembradas ${PLANS.length} órdenes de producción en demo-org.`);
+  console.log(`Sembradas ${PLANS.length} órdenes de producción en ${TENANT}.`);
 }
 
 main()

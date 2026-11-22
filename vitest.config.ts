@@ -13,6 +13,8 @@ export default defineConfig({
     // default for the rest of the suite.
     environment: "node",
     // e2e/ holds Playwright specs (pnpm test:e2e), not Vitest tests.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    // .claude/ may hold agent worktrees: whole copies of the repo whose
+    // specs must not run (or fail) as part of this checkout's suite.
+    exclude: [...configDefaults.exclude, "e2e/**", ".claude/**"],
   },
 });
