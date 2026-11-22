@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { LotStatusBadge } from "@/components/materials/LotStatusBadge";
@@ -28,6 +30,8 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
 
   const canChangeStatus = user.role === "bodega" || user.role === "calidad";
   const canUpload = UPLOAD_ROLES.raw_material_lot.includes(user.role);
+  // Same roles as /api/pdf/lot-label/[id].
+  const canPrintLabel = (user.role === "bodega" || user.role === "calidad") && lot.qrCode !== null;
 
   const fields: { label: string; value: string }[] = [
     { label: "Materia prima", value: `${lot.rawMaterial.code} — ${lot.rawMaterial.name}` },
@@ -36,8 +40,8 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
     { label: "Código QR interno", value: lot.qrCode ?? "—" },
     { label: "Cantidad recibida", value: `${lot.quantityReceived} ${lot.rawMaterial.unit}` },
     { label: "Cantidad disponible", value: `${lot.quantityAvailable} ${lot.rawMaterial.unit}` },
-    { label: "Fecha de recepción", value: lot.receivedAt.toLocaleDateString("es-CO") },
-    { label: "Fecha de vencimiento", value: lot.expiryDate.toLocaleDateString("es-CO") },
+    { label: "Fecha de recepción", value: lot.receivedAt.toLocaleDateString("es-CO", { timeZone: "America/Bogota" }) },
+    { label: "Fecha de vencimiento", value: lot.expiryDate.toLocaleDateString("es-CO", { timeZone: "UTC" }) },
     { label: "Enlace externo del COA", value: lot.coaDocumentUrl ?? "No suministrado" },
   ];
 
@@ -58,6 +62,19 @@ export default async function LotDetailPage({ params }: { params: Promise<{ id: 
       </dl>
 
       {canChangeStatus && <LotStatusAction lotId={lot.id} status={lot.status} />}
+
+      {canPrintLabel && (
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={
+            <a href={`/api/pdf/lot-label/${lot.id}`} target="_blank" rel="noopener">
+              <Printer aria-hidden />
+              Imprimir etiqueta con QR
+            </a>
+          }
+        />
+      )}
 
       <section aria-labelledby="coa-title" className="flex flex-col gap-3">
         <h2 id="coa-title" className="font-sans text-lg font-semibold text-foreground">

@@ -6,6 +6,7 @@ type CreateArgs = Prisma.RawMaterialLotCreateArgs;
 
 let rawMaterial: { id: string } | null;
 let setStatusCount: number;
+let lotExpiry: Date;
 
 const create = vi.fn(async (args: CreateArgs): Promise<RawMaterialLot> => {
   return {
@@ -16,12 +17,14 @@ const create = vi.fn(async (args: CreateArgs): Promise<RawMaterialLot> => {
 const rawMaterialFindFirst = vi.fn(async () => rawMaterial);
 const lotUpdateMany = vi.fn(async () => ({ count: setStatusCount }));
 const lotFindFirstOrThrow = vi.fn(async () => ({ id: "lot-1", status: "liberado" }));
+const lotFindFirst = vi.fn(async () => ({ id: "lot-1", status: "cuarentena", expiryDate: lotExpiry }));
 
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       rawMaterial: { findFirst: rawMaterialFindFirst },
-      rawMaterialLot: { create, updateMany: lotUpdateMany, findFirstOrThrow: lotFindFirstOrThrow },
+      user: { findMany: vi.fn(async () => []) },
+      rawMaterialLot: { create, updateMany: lotUpdateMany, findFirstOrThrow: lotFindFirstOrThrow, findFirst: lotFindFirst },
     }),
 }));
 
@@ -36,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   rawMaterial = { id: "550e8400-e29b-41d4-a716-446655440000" };
   setStatusCount = 1;
+  lotExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 });
 
 describe("materials.receiveLot", () => {
@@ -75,6 +79,14 @@ describe("materials.receiveLot", () => {
 });
 
 describe("materials.setStatus", () => {
+  it("refuses to release an expired lot, but still lets it be rejected", async () => {
+    lotExpiry = new Date("2020-01-01T00:00:00.000Z");
+    await expect(caller("calidad").setStatus({ id: LOT_ID, status: "liberado" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(lotUpdateMany).not.toHaveBeenCalled();
+    await caller("calidad").setStatus({ id: LOT_ID, status: "rechazado" });
+    expect(lotUpdateMany).toHaveBeenCalled();
+  });
+
   it("scopes the guarded transition to the caller's tenant", async () => {
     await caller("calidad").setStatus({ id: LOT_ID, status: "liberado" });
     expect(lotUpdateMany).toHaveBeenCalledWith({

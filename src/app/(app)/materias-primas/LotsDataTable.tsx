@@ -18,9 +18,9 @@ import {
 import { ArrowUpDown, TriangleAlert } from "lucide-react";
 import { LotStatusBadge } from "@/components/materials/LotStatusBadge";
 import { cn } from "@/lib/utils";
+import { expiresSoon, isExpired, isLowStock } from "@/lib/materials/lotAvailability";
 import type { LotStatus } from "@prisma/client";
 
-const DAYS_UNTIL_EXPIRY_WARNING = 30;
 
 export type LotRow = {
   id: string;
@@ -29,6 +29,9 @@ export type LotRow = {
   materialName: string;
   status: LotStatus;
   expiryDate: string;
+  quantityAvailable: number;
+  quantityReceived: number;
+  unit: string;
 };
 
 const columns: ColumnDef<LotRow, unknown>[] = [
@@ -42,21 +45,42 @@ const columns: ColumnDef<LotRow, unknown>[] = [
     header: "Nombre",
   },
   {
+    accessorKey: "supplierLotCode",
+    header: "Lote proveedor",
+    cell: ({ row }) => <span className="font-mono text-sm">{row.original.supplierLotCode}</span>,
+  },
+  {
     accessorKey: "status",
     header: "Estado",
     cell: ({ row }) => <LotStatusBadge status={row.original.status} />,
   },
   {
-    accessorKey: "expiryDate",
-    header: "Próximo a vencer",
+    accessorKey: "quantityAvailable",
+    header: "Disponible",
     cell: ({ row }) => {
-      const expiry = new Date(row.original.expiryDate);
-      const warningDate = new Date(Date.now() + DAYS_UNTIL_EXPIRY_WARNING * 24 * 60 * 60 * 1000);
-      const proximo = row.original.status !== "rechazado" && expiry <= warningDate;
+      const { quantityAvailable, quantityReceived, unit } = row.original;
+      const low = isLowStock(quantityAvailable, quantityReceived);
+      const empty = quantityAvailable <= 0;
       return (
-        <span className={cn("flex items-center gap-1 font-mono text-sm", proximo && "text-pending")}>
-          {proximo && <TriangleAlert className="size-4" aria-hidden />}
-          {expiry.toLocaleDateString("es-CO")}
+        <span className={cn("flex items-center gap-1 font-mono text-sm", (low || empty) && "text-pending")}>
+          {(low || empty) && <TriangleAlert className="size-4" aria-hidden />}
+          {quantityAvailable} {unit}
+          {empty ? " (agotado)" : low ? " (bajo)" : ""}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "expiryDate",
+    header: "Vence",
+    cell: ({ row }) => {
+      const expired = row.original.status !== "rechazado" && isExpired(row.original.expiryDate);
+      const soon = row.original.status !== "rechazado" && expiresSoon(row.original.expiryDate);
+      return (
+        <span className={cn("flex items-center gap-1 font-mono text-sm", soon && "text-pending", expired && "text-destructive")}>
+          {(soon || expired) && <TriangleAlert className="size-4" aria-hidden />}
+          {new Date(row.original.expiryDate).toLocaleDateString("es-CO", { timeZone: "UTC" })}
+          {expired ? " (vencido)" : ""}
         </span>
       );
     },

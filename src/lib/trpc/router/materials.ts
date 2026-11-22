@@ -2,6 +2,9 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
+import { isExpired } from "@/lib/materials/lotAvailability";
+import { notifyAudience } from "@/lib/notifications/notify";
+import { deliverEmails } from "@/lib/notifications/deliver";
 import { rawMaterialInput, rawMaterialUpdateInput, receiveLotInput } from "@/lib/validation/materials";
 import {
   createRawMaterial,
@@ -40,13 +43,13 @@ export const materialsRouter = router({
   // Critical 2 — no cross-tenant foreign keys).
   receiveLot: roleProcedure("bodega")
     .input(receiveLotInput)
-    .mutation(({ ctx, input }) =>
-      tenantTx(ctx, async (tx) => {
+    .mutation(async ({ ctx, input }) => {
+      const { lot, emails } = await tenantTx(ctx, async (tx) => {
         const material = await tx.rawMaterial.findFirst({
           where: { id: input.rawMaterialId, tenantId: ctx.user.tenantId },
         });
         if (!material) throw new TRPCError({ code: "NOT_FOUND", message: "Materia prima no encontrada" });
-        return tx.rawMaterialLot.create({
+        const created = await tx.rawMaterialLot.create({
           data: {
             tenantId: ctx.user.tenantId,
             rawMaterialId: material.id,
@@ -62,8 +65,22 @@ export const materialsRouter = router({
             qrCode: `MP-${randomUUID()}`,
           },
         });
-      }),
-    ),
+        // Quality has a lot waiting to be released or rejected.
+        const pending = await notifyAudience(tx, {
+          tenantId: ctx.user.tenantId,
+          actorUserId: ctx.user.id,
+          draft: {
+            kind: "lote_recibido_cuarentena",
+            title: `Lote ${created.supplierLotCode} de ${material.name} en cuarentena`,
+            body: `Recibidos ${input.quantityReceived} ${material.unit}. Revise el COA y libere o rechace el lote.`,
+            link: `/materias-primas/${created.id}`,
+          },
+        });
+        return { lot: created, emails: pending };
+      });
+      await deliverEmails(emails, ctx.user.id);
+      return lot;
+    }),
   // Server-side state machine (CLAUDE.md rule 7 — never trust client state):
   // a lot may only move out of `cuarentena`. The `updateMany` folds the
   // current-status check (and the tenant) into its `where` clause so the
@@ -74,6 +91,14 @@ export const materialsRouter = router({
     .input(z.object({ id: z.string().uuid(), status: z.enum(["liberado", "rechazado"]) }))
     .mutation(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
+        // An expired lot can still be rejected, but never released into
+        // production (it could only be weighed by mistake).
+        if (input.status === "liberado") {
+          const lot = await tx.rawMaterialLot.findFirst({ where: { id: input.id, tenantId: ctx.user.tenantId } });
+          if (lot && isExpired(lot.expiryDate)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "El lote está vencido: solo puede rechazarse." });
+          }
+        }
         const { count } = await tx.rawMaterialLot.updateMany({
           where: { id: input.id, tenantId: ctx.user.tenantId, status: "cuarentena" },
           data: { status: input.status },

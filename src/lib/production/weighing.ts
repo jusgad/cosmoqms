@@ -1,6 +1,7 @@
 import type { BatchStatus, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { advanceStageInternal } from "@/lib/production/advanceStage";
+import { isExpired } from "@/lib/materials/lotAvailability";
 
 // Final-review fix (Important 7c + Critical 2): the single server-side
 // implementation of "record one weighing", shared by BOTH write paths that
@@ -38,10 +39,6 @@ export type WeighingInput = {
 // appended to already-released, closed batch records).
 export const WEIGHABLE_STATUSES: readonly BatchStatus[] = ["planificado", "pesado"];
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
-
 function reject(message: string): never {
   throw new TRPCError({ code: "BAD_REQUEST", message });
 }
@@ -70,7 +67,7 @@ export async function applyWeighing(tx: Prisma.TransactionClient, input: Weighin
   // `expiryDate` is a `@db.Date` (midnight UTC). A lot is usable through its
   // expiry date, so it's expired only once that date is strictly before
   // today (UTC) — judged by the server clock, never the device's.
-  if (lot.expiryDate < startOfUtcDay(new Date())) {
+  if (isExpired(lot.expiryDate)) {
     reject("El lote está vencido");
   }
 

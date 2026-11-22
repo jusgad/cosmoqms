@@ -39,6 +39,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ToleranceIndicator } from "@/components/batch/ToleranceIndicator";
+import { isUsableForWeighing } from "@/lib/materials/lotAvailability";
 import { LotManualSearch, type LotOption } from "@/components/batch/LotManualSearch";
 import { QRScanner } from "@/components/batch/QRScanner";
 import { recordWeighingInput, type RecordWeighingValues } from "@/lib/validation/production";
@@ -86,9 +87,17 @@ export function WeighingForm({
     defaultValues: { rawMaterialLotId: "", actualQty: 0 },
   });
 
+  // Only lots that can really be weighed for THIS formula: released, not
+  // expired and with stock left (lotAvailability.ts, the same rule the server
+  // enforces in applyWeighing), and of a raw material the formula uses.
   const lots = useMemo(
-    () => (lotsQuery.data ?? []).filter((lot) => lot.status === "liberado"),
-    [lotsQuery.data],
+    () =>
+      (lotsQuery.data ?? []).filter(
+        (lot) =>
+          isUsableForWeighing({ status: lot.status, expiryDate: lot.expiryDate, quantityAvailable: Number(lot.quantityAvailable) }) &&
+          ingredients.some((item) => item.rawMaterialId === lot.rawMaterialId),
+      ),
+    [lotsQuery.data, ingredients],
   );
 
   // Generic, Prisma-free shape `LotManualSearch` (and the scan-match lookup
@@ -100,6 +109,7 @@ export function WeighingForm({
         id: lot.id,
         rawMaterialName: lot.rawMaterial.name,
         supplierLotCode: lot.supplierLotCode,
+        detail: `disponible ${Number(lot.quantityAvailable)} ${lot.rawMaterial.unit} · vence ${new Date(lot.expiryDate).toLocaleDateString("es-CO", { timeZone: "UTC" })}`,
       })),
     [lots],
   );
@@ -155,6 +165,13 @@ export function WeighingForm({
     setServerError(null);
     if (theoreticalQty === null) {
       setServerError("Seleccione un lote correspondiente a un ingrediente de la fórmula.");
+      return;
+    }
+    const available = selectedLot ? Number(selectedLot.quantityAvailable) : 0;
+    if (values.actualQty > available) {
+      setServerError(
+        `El lote solo tiene ${available} ${selectedLot?.rawMaterial.unit ?? ""} disponibles. Use otro lote para completar el ingrediente.`,
+      );
       return;
     }
     setIsSubmittingQueue(true);
@@ -244,7 +261,9 @@ export function WeighingForm({
           <p className="text-sm text-destructive">Error al cargar los lotes disponibles.</p>
         )}
         {!lotsQuery.isLoading && !lotsQuery.isError && lots.length === 0 && (
-          <p className="text-sm text-muted-foreground">No hay lotes liberados disponibles.</p>
+          <p className="text-sm text-muted-foreground">
+            No hay lotes liberados, vigentes y con existencias para los ingredientes de esta fórmula.
+          </p>
         )}
       </div>
 

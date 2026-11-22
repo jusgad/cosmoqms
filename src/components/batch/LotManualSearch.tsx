@@ -12,6 +12,8 @@ export type LotOption = {
   rawMaterialName: string;
   supplierLotCode: string;
   supplierName?: string;
+  // Extra line under the name, e.g. available stock and expiry date.
+  detail?: string;
 };
 
 export function LotManualSearch({
@@ -47,6 +49,7 @@ export function LotManualSearch({
             >
               {lot.rawMaterialName} — {lot.supplierLotCode}
               {lot.supplierName ? ` (${lot.supplierName})` : ""}
+              {lot.detail && <span className="block font-mono text-xs text-muted-foreground">{lot.detail}</span>}
             </button>
           </li>
         ))}

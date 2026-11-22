@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
@@ -19,7 +20,17 @@ export default async function NuevaMateriaPrimaPage() {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-sans text-2xl font-semibold text-foreground">Recibir lote de materia prima</h1>
-      <ReceiveLotForm materials={materials} />
+      {materials.length === 0 ? (
+        <p className="rounded-card border border-border bg-card p-4 text-sm text-foreground">
+          Antes de recibir un lote, agregue la materia prima al{" "}
+          <Link href="/materias-primas/catalogo" className="font-medium text-primary underline-offset-4 hover:underline">
+            catálogo
+          </Link>
+          .
+        </p>
+      ) : (
+        <ReceiveLotForm materials={materials} />
+      )}
     </div>
   );
 }
