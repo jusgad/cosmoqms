@@ -2,7 +2,14 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, roleProcedure, tenantTx } from "@/lib/trpc/trpc";
 import { sumPercentages, isWithinTolerance } from "@/lib/formulas/validateComposition";
-import { createFormulaInput } from "@/lib/validation/formulas";
+import { createFormulaInput, qcSpecificationInput } from "@/lib/validation/formulas";
+import { addSpecification, removeSpecification } from "@/lib/formulas/specifications";
+import {
+  archiveOtherActiveVersions,
+  createNewVersion,
+  removeIngredient,
+  updateIngredientPercentage,
+} from "@/lib/formulas/versioning";
 
 // Tenant isolation (final review, Critical 2): every query filters by
 // `tenantId` explicitly (defense in depth on top of RLS — see
@@ -118,7 +125,43 @@ export const formulasRouter = router({
         if (count === 0) {
           throw new TRPCError({ code: "CONFLICT", message: "La fórmula ya no está en borrador" });
         }
+        // Only one active version per code: the previous one is archived in
+        // the same transaction (src/lib/formulas/versioning.ts).
+        await archiveOtherActiveVersions(tx, tenantId, formula);
         return tx.masterFormula.findFirstOrThrow({ where: { id: formula.id, tenantId } });
       }),
     ),
+  // Acceptance criteria (pH, viscosity…) are defined by quality, and only
+  // while the formula is a draft — see src/lib/formulas/specifications.ts.
+  addSpecification: roleProcedure("calidad")
+    .input(qcSpecificationInput)
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        const spec = await addSpecification(tx, ctx.user.tenantId, input);
+        return { id: spec.id };
+      }),
+    ),
+  removeSpecification: roleProcedure("calidad")
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(({ ctx, input }) => tenantTx(ctx, (tx) => removeSpecification(tx, ctx.user.tenantId, input.id))),
+  // Change control: a new draft version copied from the active one.
+  createVersion: roleProcedure("jefe_planta")
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        const created = await createNewVersion(tx, ctx.user.tenantId, input.id);
+        return { id: created.id, version: created.version };
+      }),
+    ),
+  updateIngredient: roleProcedure("jefe_planta")
+    .input(z.object({ id: z.string().uuid(), percentage: z.number().positive().max(100) }))
+    .mutation(({ ctx, input }) =>
+      tenantTx(ctx, async (tx) => {
+        const ingredient = await updateIngredientPercentage(tx, ctx.user.tenantId, input.id, input.percentage);
+        return { id: ingredient.id };
+      }),
+    ),
+  removeIngredient: roleProcedure("jefe_planta")
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(({ ctx, input }) => tenantTx(ctx, (tx) => removeIngredient(tx, ctx.user.tenantId, input.id))),
 });
