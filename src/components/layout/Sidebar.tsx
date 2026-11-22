@@ -15,99 +15,35 @@ import {
   Users,
   Settings,
   FileBarChart,
+  KeyRound,
 } from "lucide-react";
 import type { Role } from "@prisma/client";
 import { cn } from "@/lib/utils";
-
-const ALL_ROLES: Role[] = [
-  "operario",
-  "jefe_planta",
-  "calidad",
-  "director_tecnico",
-  "bodega",
-  "admin",
-];
+import { canOpen, type ModuleKey } from "@/lib/roles/modules";
 
 type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  roles: Role[];
+  module: ModuleKey;
 };
 
-/**
- * Role -> nav visibility, per Blueprint Section 8 ("Roles & Permissions"):
- * - Dashboard: visible to every authenticated role.
- * - Materias Primas: bodega (recibir/gestionar MP, su trabajo completo),
- *   jefe_planta (planear ordenes requiere ver lotes de MP disponibles),
- *   calidad + director_tecnico (contexto de trazabilidad/QC).
- * - Formulas: jefe_planta (programa ordenes), calidad + director_tecnico
- *   (especificaciones QC atadas a la formula).
- * - Produccion: jefe_planta, operario (captura su etapa), calidad
- *   (puntos criticos), director_tecnico (libera lote). NUNCA admin ni bodega.
- * - Calidad: calidad + director_tecnico unicamente (registrar QC, desviaciones).
- * - Trazabilidad: calidad + director_tecnico (ven trazabilidad completa).
- * - Reportes: calidad + director_tecnico (reporte BPM para INVIMA).
- * - SOPs: todos los roles de planta (operario, jefe_planta, calidad,
- *   director_tecnico, bodega) — acuse de SOP no esta restringido por rol en
- *   el blueprint. Admin no opera en planta, se excluye.
- * - Auditoria: director_tecnico ("exportar auditoria") + admin (gestion/
- *   configuracion incluye supervision de auditoria).
- * - Usuarios / Configuracion: admin unicamente, separacion de funciones —
- *   admin NUNCA ve Produccion ni Calidad (no firma lotes).
- */
+// Which roles see each entry comes from MODULE_ROLES (src/lib/roles/modules.ts),
+// the same list the page gates use, so the menu and the URLs never disagree.
+// The administrator sees every module in supervision (read-only) mode.
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ALL_ROLES },
-  {
-    href: "/materias-primas",
-    label: "Materias Primas",
-    icon: Boxes,
-    roles: ["bodega", "jefe_planta", "calidad", "director_tecnico"],
-  },
-  {
-    href: "/formulas",
-    label: "Fórmulas",
-    icon: FlaskConical,
-    roles: ["jefe_planta", "calidad", "director_tecnico"],
-  },
-  {
-    href: "/produccion",
-    label: "Producción",
-    icon: Factory,
-    roles: ["jefe_planta", "operario", "calidad", "director_tecnico"],
-  },
-  {
-    href: "/calidad",
-    label: "Calidad",
-    icon: ShieldCheck,
-    roles: ["calidad", "director_tecnico"],
-  },
-  {
-    href: "/trazabilidad",
-    label: "Trazabilidad",
-    icon: Route,
-    roles: ["calidad", "director_tecnico"],
-  },
-  {
-    href: "/reportes",
-    label: "Reportes",
-    icon: FileBarChart,
-    roles: ["calidad", "director_tecnico"],
-  },
-  {
-    href: "/sops",
-    label: "SOPs",
-    icon: BookOpen,
-    roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"],
-  },
-  {
-    href: "/auditoria",
-    label: "Auditoría",
-    icon: ClipboardList,
-    roles: ["director_tecnico", "admin"],
-  },
-  { href: "/usuarios", label: "Usuarios", icon: Users, roles: ["admin"] },
-  { href: "/configuracion", label: "Configuración", icon: Settings, roles: ["admin"] },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { href: "/materias-primas", label: "Materias Primas", icon: Boxes, module: "materiasPrimas" },
+  { href: "/formulas", label: "Fórmulas", icon: FlaskConical, module: "formulas" },
+  { href: "/produccion", label: "Producción", icon: Factory, module: "produccion" },
+  { href: "/calidad", label: "Calidad", icon: ShieldCheck, module: "calidad" },
+  { href: "/trazabilidad", label: "Trazabilidad", icon: Route, module: "trazabilidad" },
+  { href: "/reportes", label: "Reportes", icon: FileBarChart, module: "reportes" },
+  { href: "/sops", label: "SOPs", icon: BookOpen, module: "sops" },
+  { href: "/auditoria", label: "Auditoría", icon: ClipboardList, module: "auditoria" },
+  { href: "/usuarios", label: "Usuarios", icon: Users, module: "usuarios" },
+  { href: "/roles", label: "Roles y permisos", icon: KeyRound, module: "roles" },
+  { href: "/configuracion", label: "Configuración", icon: Settings, module: "configuracion" },
 ];
 
 /**
@@ -121,7 +57,7 @@ const NAV_ITEMS: NavItem[] = [
  */
 export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
-  const items = NAV_ITEMS.filter((item) => item.roles.includes(role));
+  const items = NAV_ITEMS.filter((item) => canOpen(item.module, role));
 
   return (
     <nav

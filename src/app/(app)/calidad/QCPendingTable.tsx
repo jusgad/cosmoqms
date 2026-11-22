@@ -16,9 +16,16 @@ export type PendingOrderRow = {
   plannedQuantity: number;
 };
 
-const headerCellClasses = "h-11 px-4 text-left font-sans text-xs font-semibold tracking-wide text-muted-foreground uppercase";
+const headerCellClasses =
+  "h-11 px-4 text-left font-sans text-xs font-semibold tracking-wide text-muted-foreground uppercase";
 
-export function QCPendingTable({ data }: { data: PendingOrderRow[] }) {
+export function QCPendingTable({
+  data,
+  canRecord,
+}: {
+  data: PendingOrderRow[];
+  canRecord: boolean;
+}) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   return (
@@ -42,16 +49,25 @@ export function QCPendingTable({ data }: { data: PendingOrderRow[] }) {
                   <td className="px-4 py-3">{order.formulaName}</td>
                   <td className="px-4 py-3 font-mono">{order.plannedQuantity}</td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(isExpanded ? null : order.id)}
-                      className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary hover:underline"
-                    >
-                      {isExpanded ? "Cerrar" : "Registrar resultado"}
-                    </button>
+                    {canRecord ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(isExpanded ? null : order.id)}
+                        className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary hover:underline"
+                      >
+                        {isExpanded ? "Cerrar" : "Registrar resultado"}
+                      </button>
+                    ) : (
+                      <a
+                        href={`/produccion/${order.id}`}
+                        className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary hover:underline"
+                      >
+                        Ver lote
+                      </a>
+                    )}
                   </td>
                 </tr>
-                {isExpanded && (
+                {canRecord && isExpanded && (
                   <tr className="border-b border-border last:border-0">
                     <td colSpan={4} className="bg-background px-4 py-4">
                       <QCResultForm productionOrderId={order.id} formulaId={order.formulaId} />

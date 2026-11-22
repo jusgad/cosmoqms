@@ -90,10 +90,18 @@ describe("sops router", () => {
     acks = [];
   });
 
-  it("only the quality unit drafts, only the director approves, admin sees nothing", async () => {
+  it("only the quality unit drafts, only the director approves, admin only reads", async () => {
     await expect(caller("operario").create({ code: "SOP-X", title: "Nuevo" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller("calidad").approve(approval)).rejects.toMatchObject({ code: "FORBIDDEN" });
-    await expect(caller("admin").list()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    // Supervision mode: the administrator reads SOPs but never drafts,
+    // approves or records a training acknowledgement.
+    const adminRead = await caller("admin")
+      .list()
+      .then(() => "ok")
+      .catch((error: { code?: string }) => error.code);
+    expect(adminRead).not.toBe("FORBIDDEN");
+    await expect(caller("admin").create({ code: "SOP-X", title: "Nuevo" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller("admin").acknowledge({ id: OLD_ID })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("a new code starts at version 1 and is audited", async () => {

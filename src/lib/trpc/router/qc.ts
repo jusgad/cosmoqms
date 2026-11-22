@@ -46,7 +46,7 @@ async function recordDecisionSignature(
 }
 
 export const qcRouter = router({
-  listPending: roleProcedure("calidad", "director_tecnico").query(({ ctx }) =>
+  listPending: roleProcedure("calidad", "director_tecnico", "admin").query(({ ctx }) =>
     tenantTx(ctx, (tx) => tx.productionOrder.findMany({ where: { tenantId: ctx.user.tenantId, status: "calidad" } })),
   ),
 

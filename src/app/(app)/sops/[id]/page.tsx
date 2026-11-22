@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { withTenant } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
+import { isReadOnly } from "@/lib/roles/modules";
 import { getSopDetail } from "@/lib/sops/service";
 import { listAttachments } from "@/lib/attachments/service";
 import { SOP_APPROVE_ROLES, SOP_EDIT_ROLES, SOP_STATUS_LABELS } from "@/lib/validation/sops";
@@ -100,6 +101,7 @@ export default async function SopDetailPage({ params }: { params: Promise<{ id: 
       </section>
 
       {sop.status === "vigente" &&
+        !isReadOnly(user.role) &&
         (data.acknowledgedByMe ? (
           <p className="flex items-center gap-2 text-sm text-success">
             <CircleCheck className="size-4" aria-hidden />

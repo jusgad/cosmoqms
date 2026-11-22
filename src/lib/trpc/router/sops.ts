@@ -8,10 +8,13 @@ import { acknowledgeSop, approveSop, createSopDraft, getSopDetail, listSops } fr
 // the quality unit's job; approval is the director técnico's electronic
 // signature and requires a fresh Clerk re-verification.
 const viewers = roleProcedure("operario", "jefe_planta", "calidad", "director_tecnico", "bodega");
+// The administrator reads SOPs in supervision mode but never acknowledges
+// them: "leído y entendido" is a floor-staff training record.
+const readers = roleProcedure("operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin");
 
 export const sopsRouter = router({
-  list: viewers.query(({ ctx }) => tenantTx(ctx, (tx) => listSops(tx, ctx.user.tenantId, ctx.user.id))),
-  getById: viewers
+  list: readers.query(({ ctx }) => tenantTx(ctx, (tx) => listSops(tx, ctx.user.tenantId, ctx.user.id))),
+  getById: readers
     .input(sopIdInput)
     .query(({ ctx, input }) => tenantTx(ctx, (tx) => getSopDetail(tx, ctx.user.tenantId, input.id, ctx.user.id))),
   create: roleProcedure("calidad", "director_tecnico")

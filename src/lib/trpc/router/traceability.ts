@@ -46,7 +46,7 @@ function weighingLotId(payload: Prisma.JsonValue): string | undefined {
 // instead of a bare `string[]`, fetched via one small additional
 // tenant-scoped query over the distinct ids already collected.
 export const traceabilityRouter = router({
-  byRawMaterialLot: roleProcedure("calidad", "director_tecnico")
+  byRawMaterialLot: roleProcedure("calidad", "director_tecnico", "admin")
     .input(z.object({ rawMaterialLotCode: z.string().min(1) }))
     .query(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
@@ -83,7 +83,7 @@ export const traceabilityRouter = router({
         return orders.map((o) => ({ id: o.id, orderNumber: o.orderNumber }));
       }),
     ),
-  byFinishedLot: roleProcedure("calidad", "director_tecnico")
+  byFinishedLot: roleProcedure("calidad", "director_tecnico", "admin")
     .input(z.object({ finishedProductLotCode: z.string().min(1) }))
     .query(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {

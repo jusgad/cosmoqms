@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { ShieldCheck } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
@@ -25,7 +27,13 @@ export default async function UsuariosPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h1 className="font-sans text-2xl font-semibold text-foreground">Usuarios</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="font-sans text-2xl font-semibold text-foreground">Usuarios</h1>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/roles">Roles y permisos</Link>} />
+            <Button variant="outline" nativeButton={false} render={<Link href="/usuarios/revision">Revisión de accesos</Link>} />
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground">
           {activeCount} activos de {users.length}. Las personas nuevas aparecen aquí al registrarse, con rol
           Operario. Cada cambio de rol o de estado queda en la auditoría.

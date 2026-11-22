@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { TraceabilitySearch } from "@/app/(app)/trazabilidad/TraceabilitySearch";
 
 // Server Component doing the auth/role gate (same pattern as
@@ -12,13 +11,7 @@ import { TraceabilitySearch } from "@/app/(app)/trazabilidad/TraceabilitySearch"
 // `roleProcedure("calidad", "director_tecnico")` gate, never the only
 // enforcement.
 export default async function TrazabilidadPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
-  if (user.role !== "calidad" && user.role !== "director_tecnico") {
-    redirect("/dashboard");
-  }
+  await requirePageRole(MODULE_ROLES.trazabilidad);
 
   return (
     <div className="flex flex-col gap-4">

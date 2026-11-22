@@ -10,7 +10,7 @@ import { productionReportQuery } from "@/lib/validation/reports";
 export async function GET(req: Request) {
   let user;
   try {
-    user = await requireRole(["calidad", "director_tecnico"]);
+    user = await requireRole(["calidad", "director_tecnico", "admin"]);
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: "No hay sesión activa" }, { status: 401 });
     if (err instanceof ForbiddenError) return NextResponse.json({ error: "Rol no autorizado" }, { status: 403 });

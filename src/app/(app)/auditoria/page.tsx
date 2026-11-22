@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { AuditLogView } from "@/app/(app)/auditoria/AuditLogView";
 
 // Server Component doing the auth/role gate (same pattern as
@@ -9,13 +8,7 @@ import { AuditLogView } from "@/app/(app)/auditoria/AuditLogView";
 // "director_tecnico")` gate — never the only enforcement, same reasoning as
 // every other gated page in this codebase.
 export default async function AuditoriaPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
-  if (user.role !== "admin" && user.role !== "director_tecnico") {
-    redirect("/dashboard");
-  }
+  await requirePageRole(MODULE_ROLES.auditoria);
 
   return (
     <div className="flex flex-col gap-4">

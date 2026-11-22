@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { FileSpreadsheet, FileText } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { Button } from "@/components/ui/button";
 
 const inputClasses =
@@ -13,13 +12,7 @@ function isoDay(date: Date): string {
 // A plain GET form straight to the report route: the browser downloads the
 // file itself, so this page needs no client JavaScript.
 export default async function ReportesPage() {
-  const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
-  }
-  if (user.role !== "calidad" && user.role !== "director_tecnico") {
-    redirect("/dashboard");
-  }
+  await requirePageRole(MODULE_ROLES.reportes);
 
   const today = new Date();
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
