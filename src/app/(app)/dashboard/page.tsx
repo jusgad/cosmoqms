@@ -8,6 +8,11 @@ import { MonthlyOutcomeChart } from "@/components/dashboard/MonthlyOutcomeChart"
 import { StageDurationChart } from "@/components/dashboard/StageDurationChart";
 import { DeviationStatusBreakdown } from "@/components/dashboard/DeviationStatusBreakdown";
 import { averageStageDurations, monthlyOutcomes, qcPassRate, windowStart } from "@/lib/dashboard/kpis";
+import { loadPendingTasks } from "@/lib/dashboard/pendingTasks";
+import { PendingTasks } from "@/components/dashboard/PendingTasks";
+import { QuickActions } from "@/components/dashboard/QuickActions";
+import { canOpen } from "@/lib/roles/modules";
+import { ROLE_LABELS } from "@/lib/validation/users";
 
 const DAYS_UNTIL_EXPIRY_WARNING = 30;
 const QC_WINDOW_DAYS = 30;
@@ -99,17 +104,30 @@ export default async function DashboardPage() {
     .filter((group) => group.status !== "cerrada")
     .reduce((sum, group) => sum + group._count._all, 0);
   const passRate = qcPassRate(recentQc);
+  // A KPI tile links to its list only when this role can open that module.
+  const link = (module: Parameters<typeof canOpen>[0], href: string) => (canOpen(module, user.role) ? href : undefined);
+  const pendingTasks = await withTenant(tenantId, user.id, (tx) => loadPendingTasks(tx, tenantId, user.role, user.id));
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="font-sans text-2xl font-semibold text-foreground">Dashboard</h1>
 
+      <QuickActions role={user.role} />
+
+      <PendingTasks tasks={pendingTasks} roleLabel={ROLE_LABELS[user.role]} />
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <KPICard label="Lotes en curso" value={lotesEnCurso} />
-        <KPICard label="Desviaciones abiertas" value={desviacionesAbiertas} />
-        <KPICard label="Vencimientos próximos" value={vencimientosProximos} hint={`MP en los próximos ${DAYS_UNTIL_EXPIRY_WARNING} días`} />
-        <KPICard label="Lotes liberados este mes" value={lotesLiberadosEsteMes} />
+        <KPICard label="Lotes en curso" value={lotesEnCurso} href={link("produccion", "/produccion")} />
+        <KPICard label="Desviaciones abiertas" value={desviacionesAbiertas} href={link("desviaciones", "/calidad/desviaciones")} />
         <KPICard
+          label="Vencimientos próximos"
+          value={vencimientosProximos}
+          hint={`MP en los próximos ${DAYS_UNTIL_EXPIRY_WARNING} días`}
+          href={link("materiasPrimas", "/materias-primas")}
+        />
+        <KPICard label="Lotes liberados este mes" value={lotesLiberadosEsteMes} href={link("trazabilidad", "/trazabilidad")} />
+        <KPICard
+          href={link("calidad", "/calidad")}
           label={`Conformidad QC (${QC_WINDOW_DAYS} días)`}
           value={passRate.rate === null ? "—" : `${Math.round(passRate.rate * 100)}%`}
           hint={passRate.total === 0 ? "Sin resultados en el período" : `${passRate.passed} de ${passRate.total} resultados`}

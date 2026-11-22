@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StageTracker } from "@/components/batch/StageTracker";
 import { EventTimeline } from "@/components/batch/EventTimeline";
@@ -61,7 +62,7 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
 
       <StageTracker status={order.status} />
 
-      {WEIGHABLE_STATUSES.includes(order.status) && (
+      {WEIGHABLE_STATUSES.includes(order.status) && (user.role === "operario" || user.role === "jefe_planta") && (
         <Button
           render={
             <Link href={`/produccion/${order.id}/pesaje`}>
@@ -100,6 +101,20 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
         <Button
           variant="outline"
           render={<Link href={`/produccion/${order.id}/desviacion/nueva`}>Reportar desviación</Link>}
+        />
+      )}
+
+      {/* Batch record export: same roles /api/pdf/batch/[id] allows. */}
+      {["calidad", "director_tecnico", "admin"].includes(user.role) && (
+        <Button
+          variant="outline"
+          nativeButton={false}
+          render={
+            <a href={`/api/pdf/batch/${order.id}`} target="_blank" rel="noopener">
+              <FileText aria-hidden />
+              Descargar batch record (PDF)
+            </a>
+          }
         />
       )}
 

@@ -15,12 +15,15 @@ const findFirst = vi.fn(async (): Promise<MockOrder | null> => currentOrder);
 // TOCTOU-guarded write in `advanceStageInternal` (Task 11 review round 1).
 const updateMany = vi.fn(async (): Promise<{ count: number }> => ({ count: 1 }));
 
+const { userFindMany } = vi.hoisted(() => ({ userFindMany: vi.fn(async (): Promise<unknown[]> => []) }));
+
 vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       batchSignature: { create: batchSignatureCreate },
       batchEvent: { create: batchEventCreate },
       productionOrder: { findFirst, updateMany },
+      user: { findMany: userFindMany },
     }),
 }));
 
@@ -181,6 +184,10 @@ describe("production.sign", () => {
       reauthVerified: true,
     });
     expect(updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "calidad" } }));
+    // Hand-off notice: quality now has a batch to test.
+    expect(userFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ role: { in: ["calidad"] }, id: { not: "u1" } }) }),
+    );
   });
 
   // Final review (Important 6): one weighing of a multi-ingredient formula is

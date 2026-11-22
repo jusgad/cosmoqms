@@ -23,6 +23,10 @@ export const NOTIFICATION_AUDIENCE: Record<NotificationKind, Role[]> = {
   desviacion_creada: ["calidad", "director_tecnico"],
   desviacion_pendiente_aprobacion: ["director_tecnico"],
   qc_fuera_de_especificacion: ["calidad", "director_tecnico", "jefe_planta"],
+  // Workflow hand-offs: whoever has to act next hears about it.
+  lote_recibido_cuarentena: ["calidad"],
+  orden_lista_para_calidad: ["calidad"],
+  lote_listo_para_liberar: ["director_tecnico"],
 };
 
 // Must be called with the caller's own `withTenant` transaction so the inbox

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ClipboardCheck, FlaskConical } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Boxes, ClipboardCheck, FlaskConical, Microscope } from "lucide-react";
 import type { NotificationKind } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
@@ -12,6 +12,9 @@ const KIND_META: Record<NotificationKind, { label: string; icon: typeof AlertTri
   desviacion_creada: { label: "Desviación", icon: AlertTriangle, tone: "text-pending" },
   desviacion_pendiente_aprobacion: { label: "Aprobación pendiente", icon: ClipboardCheck, tone: "text-primary" },
   qc_fuera_de_especificacion: { label: "QC fuera de especificación", icon: FlaskConical, tone: "text-destructive" },
+  lote_recibido_cuarentena: { label: "Lote en cuarentena", icon: Boxes, tone: "text-pending" },
+  orden_lista_para_calidad: { label: "Orden lista para calidad", icon: Microscope, tone: "text-primary" },
+  lote_listo_para_liberar: { label: "Lote listo para liberar", icon: BadgeCheck, tone: "text-success" },
 };
 
 export default async function NotificacionesPage() {

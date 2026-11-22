@@ -369,6 +369,9 @@ enum NotificationKind {
   desviacion_creada
   desviacion_pendiente_aprobacion
   qc_fuera_de_especificacion
+  lote_recibido_cuarentena
+  orden_lista_para_calidad
+  lote_listo_para_liberar
 }
 
 // One row per recipient (fan-out at write time) so each person's read state

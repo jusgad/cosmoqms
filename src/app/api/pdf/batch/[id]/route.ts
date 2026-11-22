@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireRole, UnauthorizedError, ForbiddenError } from "@/lib/auth";
 import { withTenant } from "@/lib/db";
-import { renderBatchRecordHtml, renderPdf, type BatchRecordOrder } from "@/lib/pdf";
+import { TRPCError } from "@trpc/server";
+import { renderBatchRecordHtml, renderPdf } from "@/lib/pdf";
+import { loadBatchRecord } from "@/lib/batchRecord";
 
 // Read-only endpoint, but still routed through `withTenant` (not a plain
 // `prisma` call) per the codebase's established pattern — RLS is enforced by
@@ -21,7 +23,7 @@ import { renderBatchRecordHtml, renderPdf, type BatchRecordOrder } from "@/lib/p
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
   try {
-    user = await requireRole(["calidad", "director_tecnico"]);
+    user = await requireRole(["calidad", "director_tecnico", "admin"]);
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ success: false }, { status: 401 });
     if (err instanceof ForbiddenError) return NextResponse.json({ success: false }, { status: 403 });
@@ -30,37 +32,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params;
 
-  const order = await withTenant(user.tenantId, user.id, (tx) =>
-    tx.productionOrder.findUniqueOrThrow({
-      where: { id, tenantId: user.tenantId },
-      include: { signatures: true, qcResults: true, events: true },
-    }),
-  );
-
-  // Convert Prisma `Decimal`/`Date` values to plain `number`/`string` at this
-  // boundary — same pattern as `qc.ts`'s `specsForFormula` — so `pdf.ts`
-  // stays free of a Prisma dependency and its pure `renderBatchRecordHtml`
-  // function is trivially unit-testable with a plain object fixture.
-  const batchRecord: BatchRecordOrder = {
-    orderNumber: order.orderNumber,
-    status: order.status,
-    signatures: order.signatures.map((s) => ({
-      stage: s.stage,
-      signedBy: s.signedBy,
-      meaningStatement: s.meaningStatement,
-      signedAt: s.signedAt.toISOString(),
-    })),
-    qcResults: order.qcResults.map((r) => ({
-      parameter: r.parameter,
-      measuredValue: Number(r.measuredValue),
-      result: r.result,
-    })),
-    events: order.events.map((e) => ({
-      eventType: e.eventType,
-      occurredAt: e.occurredAt.toISOString(),
-      actorUserId: e.actorUserId,
-    })),
-  };
+  // loadBatchRecord filters by tenantId explicitly (defense in depth on top
+  // of RLS) and resolves user ids to names for the printed document.
+  let batchRecord;
+  try {
+    batchRecord = await withTenant(user.tenantId, user.id, (tx) => loadBatchRecord(tx, user.tenantId, id, user.id));
+  } catch (err) {
+    if (err instanceof TRPCError && err.code === "NOT_FOUND") return NextResponse.json({ success: false }, { status: 404 });
+    throw err;
+  }
 
   const html = renderBatchRecordHtml(batchRecord);
   const pdf = await renderPdf(html);
@@ -70,7 +50,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="batch-record-${order.orderNumber}.pdf"`,
+      "Content-Disposition": `inline; filename="batch-record-${batchRecord.orderNumber}.pdf"`,
     },
   });
 }

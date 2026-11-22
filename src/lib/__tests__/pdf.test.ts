@@ -62,6 +62,79 @@ describe("renderBatchRecordHtml", () => {
   });
 });
 
+describe("renderBatchRecordHtml — full batch record", () => {
+  const full: BatchRecordOrder = {
+    orderNumber: "OP-2026-015",
+    status: "liberado",
+    organization: { name: "CosmoLab S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-001" },
+    formula: { code: "F-001", name: "Crema Hidratante Base", version: 2 },
+    plannedQuantity: 100,
+    plannedStart: "2026-11-22T13:00:00.000Z",
+    finishedLotCode: "OP-2026-015",
+    generatedAt: "2026-11-22T20:00:00.000Z",
+    generatedBy: "Diana Directora",
+    weighings: [
+      {
+        material: "MP-002 — Glicerina Vegetal",
+        supplierLot: "GLIC-118",
+        theoreticalQty: 15,
+        actualQty: 15.02,
+        unit: "kg",
+        weighedBy: "Ana Operaria",
+        weighedAt: "2026-11-22T14:00:00.000Z",
+      },
+    ],
+    signatures: [{ stage: "liberado", signedBy: "Diana Directora", meaningStatement: "Libero el lote", signedAt: "2026-11-22T19:00:00.000Z" }],
+    qcResults: [{ parameter: "pH", measuredValue: 6.2, result: "pass", specification: "5.5 – 7", recordedBy: "Beatriz Calidad" }],
+    deviations: [
+      {
+        description: "Derrame de 0,5 kg",
+        status: "cerrada",
+        investigation: "Abrazadera floja",
+        correctiveAction: "Cambio de abrazadera",
+        raisedBy: "Ana Operaria",
+        approvedBy: "Diana Directora",
+      },
+    ],
+    events: [{ eventType: "Pesaje", occurredAt: "2026-11-22T14:00:00.000Z", actorUserId: "Ana Operaria" }],
+  };
+
+  it("prints the organization header, formula and finished lot", () => {
+    const html = renderBatchRecordHtml(full);
+    expect(html).toContain("CosmoLab S.A.S.");
+    expect(html).toContain("NIT 900123456-7");
+    expect(html).toContain("Registro INVIMA INVIMA-2026-001");
+    expect(html).toContain("F-001 — Crema Hidratante Base (versión 2)");
+    expect(html).toContain("Lote de producto terminado");
+  });
+
+  it("prints weighings with the supplier lot, QC against its specification and deviations with CAPA", () => {
+    const html = renderBatchRecordHtml(full);
+    expect(html).toContain("GLIC-118");
+    expect(html).toContain("15.02 kg");
+    expect(html).toContain("5.5 – 7");
+    expect(html).toContain("CONFORME");
+    expect(html).toContain("Cambio de abrazadera");
+    expect(html).toContain("Liberación");
+    expect(html).toContain("Generado por CosmoQMS");
+  });
+
+  it("escapes deviation texts and names too", () => {
+    const html = renderBatchRecordHtml({
+      ...full,
+      deviations: [{ ...full.deviations![0], description: "<b>x</b>", raisedBy: "<i>y</i>" }],
+    });
+    expect(html).not.toContain("<b>x</b>");
+    expect(html).not.toContain("<i>y</i>");
+  });
+
+  it("shows empty-state rows instead of empty tables", () => {
+    const html = renderBatchRecordHtml({ orderNumber: "OP-1", status: "planificado", signatures: [], qcResults: [], events: [] });
+    expect(html).toContain("Sin pesajes registrados.");
+    expect(html).toContain("Sin desviaciones.");
+  });
+});
+
 describe("escapeHtml", () => {
   it("escapes the five HTML-significant characters", () => {
     expect(escapeHtml(`&<>"'`)).toBe("&amp;&lt;&gt;&quot;&#39;");

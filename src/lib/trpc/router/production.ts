@@ -6,6 +6,8 @@ import { nextStage } from "@/lib/production/stateMachine";
 import { advanceStageInternal } from "@/lib/production/advanceStage";
 import { applyWeighing, assertAllIngredientsWeighed } from "@/lib/production/weighing";
 import { generateOrderNumber } from "@/lib/production/generateOrderNumber";
+import { notifyAudience } from "@/lib/notifications/notify";
+import { deliverEmails } from "@/lib/notifications/deliver";
 import {
   createProductionOrderInput,
   recordWeighingInput,
@@ -145,7 +147,7 @@ export const productionRouter = router({
         });
       }
 
-      return tenantTx(ctx, async (tx) => {
+      const { signature, emails } = await tenantTx(ctx, async (tx) => {
         const tenantId = ctx.user.tenantId;
         const order = await tx.productionOrder.findFirst({ where: { id: input.productionOrderId, tenantId } });
         if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Orden de producción no encontrada" });
@@ -187,7 +189,25 @@ export const productionRouter = router({
           await advanceStageInternal(tx, tenantId, order.id, to);
         }
 
-        return signature;
+        // Hand-off notices: packaging signed -> quality has a batch to test;
+        // quality signed -> the director técnico has a batch to release.
+        const handOff =
+          input.stage === "envasado"
+            ? { kind: "orden_lista_para_calidad" as const, title: `${order.orderNumber} lista para control de calidad` }
+            : input.stage === "calidad"
+              ? { kind: "lote_listo_para_liberar" as const, title: `${order.orderNumber} lista para liberar o rechazar` }
+              : null;
+        const emails = handOff
+          ? await notifyAudience(tx, {
+              tenantId,
+              actorUserId: ctx.user.id,
+              draft: { kind: handOff.kind, title: handOff.title, body: input.meaningStatement, link: `/produccion/${order.id}` },
+            })
+          : [];
+
+        return { signature, emails };
       });
+      await deliverEmails(emails, ctx.user.id);
+      return signature;
     }),
 });
