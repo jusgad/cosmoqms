@@ -1,0 +1,1082 @@
+{
+  "info": {
+    "name": "CosmoQMS — Reglas BPM, seguridad y reportes",
+    "_postman_id": "4c2b7e10-9d3a-4f6e-8b21-cosmoqms-bpm",
+    "description": "Prueba por la API las reglas que hacen a CosmoQMS apto para BPM: cuarentena, fórmula al 100 %, firma con reautenticación, pesajes sin internet sin duplicados, permisos por rol y reportes en CSV y PDF.\n\nRequisitos: CosmoQMS corriendo en modo de prueba local (cada petición elige su rol con la cookie `cosmoqms-demo-role`, que solo funciona en localhost) y los productos cargados con `pnpm seed:productos`. Ejecutar en orden (Run collection): cada petición guarda lo que necesita la siguiente.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "lessId",
+      "value": ""
+    },
+    {
+      "key": "champuId",
+      "value": ""
+    },
+    {
+      "key": "loteProveedor",
+      "value": ""
+    },
+    {
+      "key": "loteId",
+      "value": ""
+    },
+    {
+      "key": "ordenId",
+      "value": ""
+    },
+    {
+      "key": "eventoOffline",
+      "value": ""
+    },
+    {
+      "key": "formulaIncompleta",
+      "value": ""
+    },
+    {
+      "key": "formulaIncompletaId",
+      "value": ""
+    },
+    {
+      "key": "desviacionId",
+      "value": ""
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Un id de evento sin conexión por corrida, reutilizado en B5 y B6 para probar el duplicado.",
+          "if (!pm.collectionVariables.get('eventoOffline') || pm.info.requestName.startsWith('A1')) {",
+          "  pm.collectionVariables.set('eventoOffline', require('uuid').v4());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "A · Datos y productos",
+      "item": [
+        {
+          "name": "A1 · Salud del sistema y de la base de datos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('La app y la base responden', () => { pm.expect(body.status).to.eql('ok'); pm.expect(body.database).to.eql('ok'); });",
+                  "  pm.test('Responde en menos de 1 segundo', () => pm.expect(pm.response.responseTime).to.be.below(1000));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A2 · Catálogo con los productos nuevos (bodega)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=bodega"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias-primas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias-primas"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const list = pm.response.json().data;",
+                  "  const byCode = (code) => list.find((m) => m.code === code);",
+                  "  pm.test('El catálogo tiene al menos 19 materias primas', () => pm.expect(list.length).to.be.at.least(19));",
+                  "  pm.test('Incluye las materias primas nuevas (MP-006 a MP-019)', () => ['MP-006','MP-011','MP-014','MP-019'].forEach((c) => pm.expect(byCode(c), c).to.be.an('object')));",
+                  "  pm.collectionVariables.set('lessId', byCode('MP-006').id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A3 · Fórmulas activas para producir (jefe de planta)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/formulas.listActive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "formulas.listActive"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  const byCode = (code) => data.find((f) => f.code === code);",
+                  "  pm.test('Hay al menos 7 fórmulas activas', () => pm.expect(data.length).to.be.at.least(7));",
+                  "  pm.test('Están los productos nuevos F-004 a F-008', () => ['F-004','F-005','F-006','F-007','F-008'].forEach((c) => pm.expect(byCode(c), c).to.be.an('object')));",
+                  "  pm.test('Todas están activas', () => data.forEach((f) => pm.expect(f.status).to.eql('active')));",
+                  "  pm.collectionVariables.set('champuId', byCode('F-004').id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B · Reglas BPM en el servidor",
+      "item": [
+        {
+          "name": "B1 · Bodega recibe un lote: entra en cuarentena",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=bodega"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"rawMaterialId\": \"{{lessId}}\",\n    \"supplierLotCode\": \"{{loteProveedor}}\",\n    \"quantityReceived\": 120,\n    \"expiryDate\": \"2028-12-31\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/materials.receiveLot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "materials.receiveLot"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.collectionVariables.set('loteProveedor', 'PM-LESS-' + Date.now().toString().slice(-6));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  pm.test('El lote queda en cuarentena', () => pm.expect(data.status).to.eql('cuarentena'));",
+                  "  pm.test('Recibe su QR interno', () => pm.expect(data.qrCode).to.be.a('string').and.not.empty);",
+                  "  pm.collectionVariables.set('loteId', data.id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B2 · Jefe de planta crea una orden de Champú (F-004)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"formulaId\": \"{{champuId}}\",\n    \"plannedQuantity\": 50\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/production.create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "production.create"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  pm.test('La orden nace planificada', () => pm.expect(data.status).to.eql('planificado'));",
+                  "  pm.test('Tiene número de orden', () => pm.expect(data.orderNumber).to.match(/^OP-/));",
+                  "  pm.collectionVariables.set('ordenId', data.id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B3 · Pesar con un lote en cuarentena: rechazado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{ordenId}}\",\n    \"rawMaterialLotId\": \"{{loteId}}\",\n    \"theoreticalQty\": 7.5,\n    \"actualQty\": 7.5,\n    \"clientEventId\": \"{{$guid}}\",\n    \"occurredAt\": \"{{$isoTimestamp}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/production.recordWeighing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "production.recordWeighing"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('El servidor rechaza el pesaje (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('No registra el pesaje', () => pm.expect(body.result).to.be.undefined);",
+                  "  pm.test('El mensaje habla del estado del lote', () => pm.expect(body.error.json.message.toLowerCase()).to.match(/liberad|cuarentena|disponible/));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B4 · Calidad libera el lote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=calidad"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{loteId}}\",\n    \"status\": \"liberado\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/materials.setStatus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "materials.setStatus"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  pm.test('El lote queda liberado', () => pm.expect(data.status).to.eql('liberado'));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B5 · Pesaje sin internet: llega a la sincronización",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sync/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sync",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"clientEventId\": \"{{eventoOffline}}\",\n      \"productionOrderId\": \"{{ordenId}}\",\n      \"eventType\": \"weighing\",\n      \"payload\": {\n        \"rawMaterialLotId\": \"{{loteId}}\",\n        \"theoreticalQty\": 7.5,\n        \"actualQty\": 7.52\n      },\n      \"occurredAt\": \"{{$isoTimestamp}}\",\n      \"deviceId\": \"tableta-planta-01\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const r = pm.response.json().results[0];",
+                  "  pm.test('El pesaje se acepta', () => pm.expect(r.status).to.eql('accepted'));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B6 · El mismo pesaje reenviado: no se aplica dos veces",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/sync/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "sync",
+                "events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"events\": [\n    {\n      \"clientEventId\": \"{{eventoOffline}}\",\n      \"productionOrderId\": \"{{ordenId}}\",\n      \"eventType\": \"weighing\",\n      \"payload\": {\n        \"rawMaterialLotId\": \"{{loteId}}\",\n        \"theoreticalQty\": 7.5,\n        \"actualQty\": 7.52\n      },\n      \"occurredAt\": \"{{$isoTimestamp}}\",\n      \"deviceId\": \"tableta-planta-01\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const r = pm.response.json().results[0];",
+                  "  pm.test('Se marca como duplicado y no descuenta otra vez', () => pm.expect(r.status).to.eql('duplicate'));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B7 · Firma falsificada (sin reautenticación real): rechazada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{ordenId}}\",\n    \"stage\": \"pesado\",\n    \"meaningStatement\": \"Confirmo que realicé el pesaje conforme a la fórmula maestra\",\n    \"reauthVerified\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/production.sign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "production.sign"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Error tRPC UNAUTHORIZED', () => pm.expect(body.error.json.data.code).to.eql('UNAUTHORIZED'));",
+                  "  pm.test('No devuelve datos', () => pm.expect(body.result).to.be.undefined);",
+                  "  pm.test('El mensaje explica el motivo', () => pm.expect(body.error.json.message.toLowerCase()).to.match(/reautentic/));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B8 · Jefe de planta intenta liberar un lote: prohibido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{ordenId}}\",\n    \"meaningStatement\": \"Libero el lote para su comercialización\",\n    \"reauthVerified\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/qc.release",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "qc.release"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Error tRPC FORBIDDEN', () => pm.expect(body.error.json.data.code).to.eql('FORBIDDEN'));",
+                  "  pm.test('No devuelve datos', () => pm.expect(body.result).to.be.undefined);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B9 · Fórmula nueva en borrador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"code\": \"{{formulaIncompleta}}\",\n    \"name\": \"Fórmula incompleta de prueba\",\n    \"productType\": \"crema\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/formulas.create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "formulas.create"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.collectionVariables.set('formulaIncompleta', 'F-PM-' + Date.now().toString().slice(-6));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  pm.test('Nace en borrador', () => pm.expect(data.status).to.eql('draft'));",
+                  "  pm.collectionVariables.set('formulaIncompletaId', data.id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B10 · Solo un ingrediente al 90 %",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"formulaId\": \"{{formulaIncompletaId}}\",\n    \"rawMaterialId\": \"{{lessId}}\",\n    \"percentage\": 90,\n    \"orderIndex\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/formulas.addIngredient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "formulas.addIngredient"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B11 · Activar una fórmula que no suma 100 %: rechazado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=calidad"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{formulaIncompletaId}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/formulas.activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "formulas.activate"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('El servidor rechaza la activación (4xx)', () => pm.expect(pm.response.code).to.be.within(400, 499));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('El mensaje habla del 100 %', () => pm.expect(body.error.json.message).to.match(/100/));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B12 · Jefe de planta reporta una desviación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"productionOrderId\": \"{{ordenId}}\",\n    \"description\": \"Derrame de 0,5 kg de tensoactivo durante el pesaje; se limpió el área.\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/deviations.create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "deviations.create"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().result.data.json;",
+                  "  pm.test('La desviación queda abierta', () => pm.expect(data.status).to.eql('abierta'));",
+                  "  pm.collectionVariables.set('desviacionId', data.id);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B13 · Aprobar una desviación sin investigar: rechazado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=director_tecnico"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"json\": {\n    \"id\": \"{{desviacionId}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/deviations.approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "deviations.approve"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "  const body = pm.response.json();",
+                  "  pm.test('Error tRPC CONFLICT', () => pm.expect(body.error.json.data.code).to.eql('CONFLICT'));",
+                  "  pm.test('No devuelve datos', () => pm.expect(body.result).to.be.undefined);",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B14 · Calidad intenta crear una materia prima por la API: prohibido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=calidad"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/materias-primas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "materias-primas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"MP-NO-AUT\",\n  \"name\": \"No autorizada\",\n  \"unit\": \"kg\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C · Reportes y documentos",
+      "item": [
+        {
+          "name": "C1 · Reporte BPM en CSV (calidad)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=calidad"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/produccion?from=2026-01-01&to=2026-12-31&format=csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "produccion"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "format",
+                  "value": "csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  pm.test('Es un CSV', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv'));",
+                  "  pm.test('Trae el encabezado del reporte', () => pm.expect(pm.response.text().length).to.be.above(50));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C2 · Bodega intenta descargar el reporte BPM: prohibido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=bodega"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/produccion?from=2026-01-01&to=2026-12-31&format=csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "produccion"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "format",
+                  "value": "csv"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C3 · Etiqueta con QR del lote en PDF (bodega)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=bodega"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pdf/lot-label/{{loteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pdf",
+                "lot-label",
+                "{{loteId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  pm.test('Es un PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));",
+                  "  pm.test('El archivo empieza con %PDF', () => pm.expect(pm.response.text().slice(0, 4)).to.eql('%PDF'));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C4 · Batch record en PDF (calidad)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=calidad"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pdf/batch/{{ordenId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pdf",
+                "batch",
+                "{{ordenId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  pm.test('Es un PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C5 · Jefe de planta intenta descargar el batch record: prohibido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Cookie",
+                "value": "cosmoqms-demo-role=jefe_planta"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/pdf/batch/{{ordenId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "pdf",
+                "batch",
+                "{{ordenId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(() => {",
+                  "  pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "})();"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

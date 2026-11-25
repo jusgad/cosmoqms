@@ -4,6 +4,7 @@ import { withTenant } from "@/lib/db";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { isReadOnly } from "@/lib/roles/modules";
+import { ROLE_LABELS } from "@/lib/validation/users";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -25,7 +26,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           its own container instead of stretching the grid column and the
           whole page sideways. */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <Header orgName={organization?.name ?? "CosmoQMS"} unreadNotifications={unreadNotifications} />
+        <Header
+          orgName={organization?.name ?? "CosmoQMS"}
+          unreadNotifications={unreadNotifications}
+          roleLabel={ROLE_LABELS[user.role]}
+        />
         {isReadOnly(user.role) && (
           <p role="status" className="border-b border-border bg-muted px-4 py-2 text-xs text-foreground md:px-6">
             Modo supervisión: como administrador ve todos los módulos en solo lectura. Pesar, firmar, liberar y aprobar

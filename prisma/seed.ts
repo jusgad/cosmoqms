@@ -69,13 +69,13 @@ async function main(): Promise<void> {
     const org = await tx.organization.upsert({
       where: { id: ORG_ID },
       update: {
-        name: "CosmoLab Demo S.A.S.",
+        name: "CosmoLab S.A.S.",
         nit: "900123456-7",
         invimaRegistration: "INVIMA-DEMO-2026",
       },
       create: {
         id: ORG_ID,
-        name: "CosmoLab Demo S.A.S.",
+        name: "CosmoLab S.A.S.",
         nit: "900123456-7",
         invimaRegistration: "INVIMA-DEMO-2026",
       },

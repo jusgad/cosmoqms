@@ -36,7 +36,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
 
 const STAFF: { id: string; role: Role; fullName: string; email: string }[] = [
-  { id: DEMO_USER, role: "director_tecnico", fullName: IS_DEMO_TENANT ? "Usuario Demo" : "Diego Director (histórico)", email: IS_DEMO_TENANT ? "demo@cosmoqms.local" : "director.historico@cosmoqms.local" },
+  { id: DEMO_USER, role: "director_tecnico", fullName: IS_DEMO_TENANT ? "Diego Ramírez" : "Diego Director (histórico)", email: IS_DEMO_TENANT ? "direccion@cosmoqms.local" : "director.historico@cosmoqms.local" },
   { id: CALIDAD, role: "calidad", fullName: "Beatriz Calidad", email: IS_DEMO_TENANT ? "calidad@cosmoqms.local" : "calidad.historico@cosmoqms.local" },
   { id: JEFE, role: "jefe_planta", fullName: "Carlos Jefe de Planta", email: IS_DEMO_TENANT ? "jefe.planta@cosmoqms.local" : "jefe.historico@cosmoqms.local" },
   { id: PLANTA, role: "jefe_planta", fullName: "Ana Martínez", email: IS_DEMO_TENANT ? "planta@cosmoqms.local" : "planta.historico@cosmoqms.local" },
@@ -161,8 +161,8 @@ async function main(): Promise<void> {
     // A real organization keeps whatever its admin saved in /configuracion.
     await tx.organization.upsert({
       where: { id: TENANT },
-      create: { id: TENANT, name: "CosmoLab Demo S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-DEMO" },
-      update: IS_DEMO_TENANT ? { name: "CosmoLab Demo S.A.S.", nit: "900123456-7", invimaRegistration: "INVIMA-2026-DEMO" } : {},
+      create: { id: TENANT, name: "CosmoLab S.A.S.", nit: "900123456-7", invimaRegistration: "NSOC80523-26CO" },
+      update: IS_DEMO_TENANT ? { name: "CosmoLab S.A.S.", nit: "900123456-7", invimaRegistration: "NSOC80523-26CO" } : {},
     });
     for (const member of STAFF) {
       await tx.user.upsert({

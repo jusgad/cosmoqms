@@ -40,7 +40,7 @@ async function ensureDemoUser(): Promise<CurrentUser> {
   await withTenant(DEMO_USER.tenantId, DEMO_USER.id, (tx) =>
     tx.organization.upsert({
       where: { id: DEMO_USER.tenantId },
-      create: { id: DEMO_USER.tenantId, name: "CosmoQMS Demo" },
+      create: { id: DEMO_USER.tenantId, name: "CosmoLab S.A.S." },
       update: {},
     }),
   );
@@ -50,8 +50,8 @@ async function ensureDemoUser(): Promise<CurrentUser> {
       create: {
         id: DEMO_USER.id,
         tenantId: DEMO_USER.tenantId,
-        fullName: "Usuario Demo",
-        email: "demo@cosmoqms.local",
+        fullName: "Diego Ramírez",
+        email: "direccion@cosmoqms.local",
         role: DEMO_USER.role,
       },
       update: { role: DEMO_USER.role },

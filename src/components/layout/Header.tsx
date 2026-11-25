@@ -11,9 +11,17 @@ import { isDemoMode } from "@/lib/demoMode";
  * Component parent without making this file `"use client"`.
  */
 // Demo mode (see src/lib/demoMode.ts) has no Clerk session, so
-// `<UserButton />` is swapped for a plain label.
+// `<UserButton />` is swapped for the current role's name.
 
-export function Header({ orgName, unreadNotifications }: { orgName: string; unreadNotifications: number }) {
+export function Header({
+  orgName,
+  unreadNotifications,
+  roleLabel,
+}: {
+  orgName: string;
+  unreadNotifications: number;
+  roleLabel: string;
+}) {
   return (
     <header className="flex h-16 min-h-16 items-center justify-between gap-4 border-b border-border bg-card px-4">
       <span className="truncate font-sans text-base font-semibold text-foreground">
@@ -23,7 +31,7 @@ export function Header({ orgName, unreadNotifications }: { orgName: string; unre
         <OfflineIndicator />
         <NotificationBell unread={unreadNotifications} />
         {isDemoMode() ? (
-          <span className="text-sm text-muted-foreground">Usuario Demo</span>
+          <span className="text-sm text-muted-foreground">{roleLabel}</span>
         ) : (
           <UserButton />
         )}

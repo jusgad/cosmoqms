@@ -37,7 +37,7 @@ const rejected: ReportSourceOrder = {
 const names = new Map([["u-dir", "Diego Director Técnico"]]);
 
 const header: ReportHeader = {
-  orgName: "CosmoLab Demo S.A.S.",
+  orgName: "CosmoLab S.A.S.",
   nit: "900123456-7",
   invimaRegistration: "INVIMA-DEMO-2026",
   from: new Date(2026, 10, 1),
