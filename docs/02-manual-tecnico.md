@@ -72,7 +72,7 @@ tableta y celular, se puede instalar como app y sigue registrando pesajes sin se
 | `db` | `postgres:16-alpine` | `127.0.0.1:5433` (solo el servidor) | volumen `cosmoqms-db-data` |
 | `migrate` | etapa `builder` del Dockerfile | — | — |
 | `db-security` | `postgres:16-alpine` | — | — |
-| `cosmoqms` | Dockerfile (Node 24, salida *standalone*, Chromium) | `3001 → 3000` | volumen `cosmoqms-storage` |
+| `cosmoqms` | Dockerfile (Node 24, salida *standalone*, Chromium) | `127.0.0.1:3001 → 3000` (solo local; desde afuera se entra por Caddy) | volumen `cosmoqms-storage` |
 | `backup` | `postgres:16-alpine` | — | carpeta `BACKUP_DIR` del servidor |
 | `caddy` (perfil `https`) | `caddy:2.8-alpine` | `80`, `443` | volúmenes `caddy-data`, `caddy-config` |
 

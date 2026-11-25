@@ -1,6 +1,6 @@
 /**
- * More products for the demonstration tenants: 14 raw materials (each with a
- * released lot in stock) and 5 active master formulas with their quality
+ * More products for the demonstration tenants: up to 19 raw materials (each
+ * with a released lot in stock) and 5 active master formulas with their quality
  * specifications, so every screen (catalog, formulas, new order, weighing,
  * QC) has more than two products to work with.
  *
@@ -24,7 +24,14 @@ const CALIDAD = `${PREFIX}-calidad`;
 const DIRECTOR = TENANT === "demo-org" ? "demo-user" : `${PREFIX}-director`;
 const DAY = 24 * 60 * 60 * 1000;
 
+// MP-001 to MP-005 also come from seed-demo.ts; they are listed here so a
+// clean organization gets every ingredient the new formulas need.
 const MATERIALS = [
+  { code: "MP-001", name: "Agua Desionizada", category: "solvente", lot: "PROV-AGUA-2026-11", expiresInDays: 400 },
+  { code: "MP-002", name: "Glicerina Vegetal", category: "humectante", lot: "PROV-GLIC-2026-11", expiresInDays: 300 },
+  { code: "MP-003", name: "Fragancia Floral", category: "fragancia", lot: "PROV-FRAG-2026-11", expiresInDays: 200 },
+  { code: "MP-004", name: "Alcohol Cetílico", category: "emulsificante", lot: "PROV-CET-2026-11", expiresInDays: 250 },
+  { code: "MP-005", name: "Extracto de Aloe Vera", category: "activo", lot: "PROV-ALOE-2026-11", expiresInDays: 200 },
   { code: "MP-006", name: "Lauril Éter Sulfato de Sodio", category: "tensoactivo", lot: "PROV-LESS-2026-10", expiresInDays: 360 },
   { code: "MP-007", name: "Cocamidopropil Betaína", category: "tensoactivo", lot: "PROV-BETA-2026-10", expiresInDays: 330 },
   { code: "MP-008", name: "Cloruro de Sodio", category: "espesante", lot: "PROV-NACL-2026-09", expiresInDays: 720 },

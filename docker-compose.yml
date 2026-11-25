@@ -71,7 +71,11 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      # Solo en esta máquina, como la base: desde afuera se entra únicamente
+      # por Caddy con HTTPS. Docker se salta el cortafuegos (ufw) para los
+      # puertos que publica, así que "3001:3000" dejaría la app abierta por
+      # HTTP en un VPS. El túnel de Cloudflare y las pruebas usan localhost.
+      - "127.0.0.1:3001:3000"
     env_file:
       - .env
     environment:
