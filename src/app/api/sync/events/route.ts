@@ -62,7 +62,7 @@ function badRequest(error: string, issues?: z.core.$ZodIssue[]) {
 // `theoreticalQty`, decrements the lot's stock and advances `planificado ->
 // pesado` on the first weighing, all in one transaction.
 //
-// Non-negotiable (CLAUDE.md rules 1 and 6): `batch_events` stays append-only,
+// Non-negotiable (non-negotiable rules 1 and 6): `batch_events` stays append-only,
 // and a retried `clientEventId` is reported as `duplicate` with NO side
 // effects (no second stock decrement, no second stage advance). The
 // duplicate check runs first inside the event's transaction; a concurrent

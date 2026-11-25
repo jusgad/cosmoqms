@@ -45,7 +45,7 @@ import { deliverEmails } from "@/lib/notifications/deliver";
 //    comment documents the change; it is part of the initial migration.
 export const deviationsRouter = router({
   // Not called from any Client Component — `desviaciones/page.tsx` and
-  // `[id]/page.tsx` read Prisma directly instead (CLAUDE.md's Data Flow
+  // `[id]/page.tsx` read Prisma directly instead (the project's data-flow convention
   // rule: "Server Components leen directo de Prisma para listados/reportes",
   // same as `qc.listPending`'s own precedent). Kept on the router for API
   // completeness/testability (e.g. a future mobile client or offline sync

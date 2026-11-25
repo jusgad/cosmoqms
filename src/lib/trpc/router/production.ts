@@ -24,7 +24,7 @@ import {
 // `findFirst` + an explicit NOT_FOUND, so another tenant's id is
 // indistinguishable from a nonexistent one.
 //
-// Audit (CLAUDE.md rule 2): every write on a regulated table here is audited
+// Audit (non-negotiable rule 2): every write on a regulated table here is audited
 // by the `withAuditLog` Prisma extension applied in `withTenant` (Task 17).
 export const productionRouter = router({
   // NOTE: kept the brief's literal `orderBy: { createdBy: "asc" }` (Step 7) —
@@ -50,7 +50,7 @@ export const productionRouter = router({
         return order;
       }),
     ),
-  // Non-negotiable blueprint rule (CLAUDE.md): a formula must be
+  // Non-negotiable blueprint rule (non-negotiable rule 8): a formula must be
   // `status === "active"` to be used in a new production order — checked
   // server-side against the (tenant-scoped) formula read inside the same
   // transaction, never trusting the client-side select's filtering alone.
@@ -80,7 +80,7 @@ export const productionRouter = router({
         });
       }),
     ),
-  // Non-negotiable (CLAUDE.md rules 1 and 7): only ever `create`s a
+  // Non-negotiable (non-negotiable rules 1 and 7): only ever `create`s a
   // BatchEvent, and the stage transition goes through `advanceStageInternal`.
   // All lot/order validation, the server-side `theoreticalQty` and the stock
   // decrement live in `applyWeighing` (shared with `/api/sync/events`); the
@@ -106,7 +106,7 @@ export const productionRouter = router({
         return order;
       }),
     ),
-  // Stage attestation (Task 11). Non-negotiable (CLAUDE.md rule 3): no
+  // Stage attestation (Task 11). Non-negotiable (non-negotiable rule 3): no
   // signature persists without `reauth_verified = true` and an explicit
   // `meaning_statement` — `signInput` guarantees both at the Zod level, and
   // Clerk's own server-side `has({ reverification: "strict" })` is re-checked

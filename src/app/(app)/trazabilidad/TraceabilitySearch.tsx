@@ -53,7 +53,7 @@ export function TraceabilitySearch() {
     <div className="flex max-w-lg flex-col gap-6">
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-foreground">Dirección de búsqueda</span>
-        {/* Direction toggle — touch targets ≥44px (CLAUDE.md rule 9). */}
+        {/* Direction toggle — touch targets ≥44px (non-negotiable rule 9). */}
         <div className="flex gap-2">
           <Button
             type="button"

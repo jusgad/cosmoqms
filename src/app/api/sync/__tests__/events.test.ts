@@ -98,7 +98,7 @@ describe("POST /api/sync/events", () => {
     expect(body).toEqual({ success: true, results: [{ clientEventId: EVENT_1, status: "accepted" }] });
   });
 
-  // CLAUDE.md rule 6: a retried clientEventId is never applied twice — no
+  // non-negotiable rule 6: a retried clientEventId is never applied twice — no
   // second stock decrement, no second stage advance.
   it("reports an already-synced clientEventId as duplicate without applying it again", async () => {
     findFirst.mockResolvedValueOnce({ id: "existing" });

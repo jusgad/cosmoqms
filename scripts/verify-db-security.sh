@@ -1,5 +1,5 @@
 #!/bin/sh
-# Verifies that the database security CLAUDE.md rule 4 depends on is really
+# Verifies that the database security non-negotiable rule 4 depends on is really
 # in place: the app's role cannot bypass RLS, every table has RLS forced, and
 # the append-only tables refuse UPDATE/DELETE.
 #

@@ -18,7 +18,7 @@ import {
 // production.ts's header).
 //
 // Audit note: `raw_materials`/`raw_material_lots` are NOT among the five
-// regulated tables CLAUDE.md rule 2 names (`REGULATED_MODELS` in audit.ts),
+// regulated tables non-negotiable rule 2 names (`REGULATED_MODELS` in audit.ts),
 // so these writes are intentionally not written to `audit_log`.
 export const materialsRouter = router({
   list: roleProcedure("bodega", "jefe_planta", "calidad", "director_tecnico", "admin").query(({ ctx }) =>
@@ -81,7 +81,7 @@ export const materialsRouter = router({
       await deliverEmails(emails, ctx.user.id);
       return lot;
     }),
-  // Server-side state machine (CLAUDE.md rule 7 — never trust client state):
+  // Server-side state machine (non-negotiable rule 7 — never trust client state):
   // a lot may only move out of `cuarentena`. The `updateMany` folds the
   // current-status check (and the tenant) into its `where` clause so the
   // guarded write is atomic; zero matched rows means the lot doesn't exist

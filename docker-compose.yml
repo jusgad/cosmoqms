@@ -75,7 +75,7 @@ services:
     env_file:
       - .env
     environment:
-      # The app connects as cosmoqms_runtime: RLS applies to it (CLAUDE.md
+      # The app connects as cosmoqms_runtime: RLS applies to it (non-negotiable
       # rule 4). The owner role is only for migrations.
       DATABASE_URL: postgresql://cosmoqms_runtime:${RUNTIME_DB_PASSWORD:?Falta RUNTIME_DB_PASSWORD en .env}@db:5432/cosmoqms
       DIRECT_URL: postgresql://cosmoqms_runtime:${RUNTIME_DB_PASSWORD:?Falta RUNTIME_DB_PASSWORD en .env}@db:5432/cosmoqms

@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { canTransition } from "@/lib/production/stateMachine";
 
 // The single server-side enforcement point for batch stage transitions
-// (CLAUDE.md rule 7: never trust the client's reported state). Called from
+// (non-negotiable rule 7: never trust the client's reported state). Called from
 // inside the caller's own `withTenant`/`tenantTx` transaction, right after it
 // writes its own regulated row (weighing event, signature, QC decision), so
 // both commit or roll back together.

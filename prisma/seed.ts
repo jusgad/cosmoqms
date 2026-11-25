@@ -11,7 +11,7 @@
  * repeatedly against the same dev database never duplicates rows or throws
  * on a unique-constraint violation.
  *
- * Non-negotiable safety rail (CLAUDE.md): this must never run against a
+ * Non-negotiable safety rail (docs/04-manual-de-desarrollador.md §4): this must never run against a
  * production database, regardless of who invokes it or how.
  */
 if (process.env.NODE_ENV === "production") {

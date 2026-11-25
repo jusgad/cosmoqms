@@ -28,7 +28,7 @@ describe("production.create", () => {
   });
 
   it("rejects creating an order from a non-active formula", async () => {
-    // Non-negotiable (CLAUDE.md): a formula must be `status === "active"` to
+    // Non-negotiable (docs/04-manual-de-desarrollador.md §4): a formula must be `status === "active"` to
     // be used in a new production order — enforced server-side.
     const error = await caller()
       .create({ formulaId: "550e8400-e29b-41d4-a716-446655440000", plannedQuantity: 10 })

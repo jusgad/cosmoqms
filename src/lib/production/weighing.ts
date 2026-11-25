@@ -80,7 +80,7 @@ export async function applyWeighing(tx: Prisma.TransactionClient, input: Weighin
   // `WeighingForm.tsx` uses client-side (`percentage / 100 * plannedQuantity`),
   // but from the server's own formula/order rows. The persisted value is
   // always this one; any client-sent `theoreticalQty` is ignored, since it is
-  // exactly the kind of client state CLAUDE.md says never to trust.
+  // exactly the kind of client state the non-negotiable rules say never to trust.
   const theoreticalQty = (Number(ingredient.percentage) / 100) * Number(order.plannedQuantity);
 
   // Atomic, TOCTOU-safe stock decrement: the `where` re-checks the lot is

@@ -77,7 +77,7 @@ export const qcRouter = router({
   //
   // The verdict is the server's: when the formula has a specification for
   // this parameter, `result` is recomputed from it and the client's value is
-  // ignored (CLAUDE.md rule 7). Only a parameter with no specification at all
+  // ignored (non-negotiable rule 7). Only a parameter with no specification at all
   // keeps the submitted verdict. A `fail` notifies quality and the plant.
   recordResult: roleProcedure("calidad")
     .input(recordResultInput)

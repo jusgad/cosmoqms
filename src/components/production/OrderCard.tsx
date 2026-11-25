@@ -5,7 +5,7 @@ export type OrderWithFormula = ProductionOrder & { formula: MasterFormula };
 
 // Opens the order's detail page (weighing, signatures, QC, timeline). Found
 // by the E2E suite: the card used to be a static block, leaving no way to
-// reach an order from the board. Non-negotiable (CLAUDE.md): stage
+// reach an order from the board. Non-negotiable (docs/04-manual-de-desarrollador.md §4): stage
 // transitions only ever happen server-side via signing — `draggable={false}`
 // ensures the Kanban never offers a client-side drag gesture the server
 // state machine would have to reject.

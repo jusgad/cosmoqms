@@ -18,7 +18,7 @@ import {
 // which is always verified to belong to the caller's tenant first.
 //
 // Audit note: `master_formulas`/`formula_ingredients` are NOT among the five
-// regulated tables CLAUDE.md rule 2 names (`REGULATED_MODELS` in audit.ts),
+// regulated tables non-negotiable rule 2 names (`REGULATED_MODELS` in audit.ts),
 // so these writes are intentionally not written to `audit_log`.
 export const formulasRouter = router({
   list: roleProcedure("jefe_planta", "calidad", "director_tecnico", "admin").query(({ ctx }) =>
@@ -84,7 +84,7 @@ export const formulasRouter = router({
         return tx.formulaIngredient.create({ data: input });
       }),
     ),
-  // Non-negotiable blueprint rule (CLAUDE.md rule 8): a formula may only
+  // Non-negotiable blueprint rule (non-negotiable rule 8): a formula may only
   // become `active` if its ingredients sum to 100% ± tolerance — checked
   // server-side against the ingredients read inside the same transaction.
   //

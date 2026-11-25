@@ -20,7 +20,7 @@ const buttonVariants = cva(
       },
       size: {
         // Default and lg meet the project's 44x44px minimum touch target
-        // (CLAUDE.md rule 9 — plant-floor use with gloves). xs/sm/icon-xs/icon-sm
+        // (non-negotiable rule 9 — plant-floor use with gloves). xs/sm/icon-xs/icon-sm
         // are compact variants for dense desktop-only UI (e.g. table row actions)
         // and must not be used for primary forms/CTAs.
         default:

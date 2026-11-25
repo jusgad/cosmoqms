@@ -5,7 +5,7 @@ import type { RawMaterialInput, RawMaterialUpdateInput } from "@/lib/validation/
 // Raw-material catalog maintenance, shared by `materials` tRPC procedures and
 // the REST API. Every function runs inside the caller's `withTenant`
 // transaction and filters by `tenantId` explicitly (defense in depth until
-// RLS is live). Not a regulated table (CLAUDE.md rule 2), so no audit row.
+// RLS is live). Not a regulated table (non-negotiable rule 2), so no audit row.
 
 function isUniqueViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";

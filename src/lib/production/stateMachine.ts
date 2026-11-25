@@ -1,6 +1,6 @@
 import type { BatchStatus } from "@prisma/client";
 
-// Non-negotiable (CLAUDE.md): batch stage transitions are validated
+// Non-negotiable (docs/04-manual-de-desarrollador.md §4): batch stage transitions are validated
 // server-side as a strict state machine — the client's reported state is
 // never trusted. This module is the single enforcement point, consumed by
 // `advanceStageInternal` (Task 9) and, transitively, Tasks 10-13.

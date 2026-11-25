@@ -2,7 +2,7 @@ import { MODULE_ROLES, requirePageRole } from "@/lib/pageAccess";
 import { withTenant } from "@/lib/db";
 import { QCPendingTable, type PendingOrderRow } from "@/app/(app)/calidad/QCPendingTable";
 
-// Server Component reading direct from Prisma (CLAUDE.md's Data Flow rule:
+// Server Component reading direct from Prisma (the project's data-flow convention:
 // "Server Components leen directo de Prisma para listados/reportes"), same
 // query shape as `qc.listPending` (src/lib/trpc/router/qc.ts) — mirrors how
 // materias-primas/page.tsx and produccion/page.tsx read their own listings.

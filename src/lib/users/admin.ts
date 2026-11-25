@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import type { UpdateUserInput } from "@/lib/validation/users";
 
 // User administration (/usuarios). `users` is not one of the five regulated
-// tables of CLAUDE.md rule 2, but a role decides who may sign which batch
+// tables of non-negotiable rule 2, but a role decides who may sign which batch
 // stage, so every change is written to `audit_log` explicitly, in the same
 // transaction (tableName "User").
 

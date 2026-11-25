@@ -11,7 +11,7 @@ const STATUS_LABEL: Record<string, string> = {
   cerrada: "Cerrada",
 };
 
-// Server Component reading direct from Prisma (CLAUDE.md's Data Flow rule),
+// Server Component reading direct from Prisma (the project's data-flow convention),
 // same pattern as calidad/page.tsx (Task 12): lists deviations that are still
 // open (`status !== "cerrada"`) — the same population `qc.release`'s guard
 // (Task 12) checks before allowing a batch to be released.

@@ -5,7 +5,7 @@ import { asRole, expectHeading, failOnPageErrors, trpcCall, uniqueSuffix } from 
 // receive raw material (bodega) -> release lots (calidad) -> master formula
 // (jefe_planta) -> activate it at 100% (calidad) -> production order
 // (jefe_planta) -> weighing every ingredient (jefe_planta, who does the plant work) -> electronic
-// signature, which must demand re-authentication (CLAUDE.md rule 3).
+// signature, which must demand re-authentication (non-negotiable rule 3).
 
 test.describe.configure({ mode: "serial" });
 

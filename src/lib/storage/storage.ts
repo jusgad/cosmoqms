@@ -12,7 +12,7 @@ export interface FileStorage {
 // a Docker volume in docker-compose. STORAGE_DRIVER=s3: any S3-compatible
 // bucket (AWS S3, MinIO, Cloudflare R2). The S3 driver uses
 // bucket-scoped S3 access keys, never the database owner credentials
-// (CLAUDE.md rule 4: privileged roles are for migrations only).
+// (non-negotiable rule 4: privileged roles are for migrations only).
 export function getStorage(env: NodeJS.ProcessEnv = process.env): FileStorage {
   const driver = env.STORAGE_DRIVER ?? "local";
   if (driver === "local") {

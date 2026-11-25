@@ -118,7 +118,7 @@ describe("qc.recordResult", () => {
     expect(qcResultCreate).not.toHaveBeenCalled();
   });
 
-  // CLAUDE.md rule 7: the persisted verdict is the server's, not the client's.
+  // non-negotiable rule 7: the persisted verdict is the server's, not the client's.
   it("persists 'pass' when the value is inside the spec even if the client sent 'fail'", async () => {
     specs = [spec("pH", 5.5, 7)];
     const result = await caller("calidad").recordResult({ ...input, parameter: " PH ", measuredValue: 6.2, result: "fail" });

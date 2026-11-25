@@ -28,7 +28,7 @@ grant usage, select on all sequences in schema public to cosmoqms_runtime;
 -- Migration bookkeeping is the owner's business only.
 revoke all on table _prisma_migrations from cosmoqms_runtime;
 
--- Append-only tables (CLAUDE.md rule 1 and the audit trail; attachments are
+-- Append-only tables (non-negotiable rule 1 and the audit trail; attachments are
 -- never replaced): no UPDATE/DELETE privilege at all, on top of the missing
 -- RLS policies for those commands.
 revoke update, delete on batch_events, audit_log, attachments from cosmoqms_runtime;

@@ -5,7 +5,7 @@ import { SOP_VIEW_ROLES, type ApproveSopInput, type CreateSopInput } from "@/lib
 
 // BPM document control for SOPs. Every function runs inside the caller's
 // `withTenant` transaction and filters by `tenantId` explicitly (RLS is the
-// second wall). `sops` is not one of the five regulated tables of CLAUDE.md
+// second wall). `sops` is not one of the five regulated tables of non-negotiable
 // rule 2, but a controlled document's lifecycle is audited the same way:
 // every create/approve/obsolete writes `audit_log` in the same transaction.
 
@@ -82,7 +82,7 @@ export async function createSopDraft(
 
 // Approval is the document's electronic signature: the caller must have
 // re-verified with Clerk (checked by the router) and the meaning statement
-// is stored with it (CLAUDE.md rule 3). The previous vigente version of the
+// is stored with it (non-negotiable rule 3). The previous vigente version of the
 // same code becomes obsoleto in the same transaction.
 export async function approveSop(
   tx: Prisma.TransactionClient,

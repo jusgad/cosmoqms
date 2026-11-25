@@ -8,7 +8,7 @@
  * Every write goes through `withTenant` (src/lib/db.ts), i.e. through the same
  * audited client the app uses, so the regulated rows it creates (orders,
  * batch events, QC results, deviations, finished lots) all get their
- * `audit_log` row (CLAUDE.md rule 2). Idempotent: it does nothing if the demo
+ * `audit_log` row (non-negotiable rule 2). Idempotent: it does nothing if the demo
  * tenant already has production orders.
  */
 if (process.env.NODE_ENV === "production") {

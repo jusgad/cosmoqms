@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 
-// CLAUDE.md rule 2 ("Toda mutación sobre una tabla regulada... debe escribir
+// non-negotiable rule 2 ("Toda mutación sobre una tabla regulada... debe escribir
 // en audit_log en la misma transacción") scopes this to exactly the 5
 // regulated tables it names — not every model in the schema.
 const REGULATED_MODELS = new Set([

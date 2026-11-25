@@ -26,7 +26,7 @@
 --      the table owner is subject to the policies (defense in depth in case
 --      the runtime role ever ends up being the owner). FORCE does NOT affect
 --      superusers or BYPASSRLS roles — point 1 is still required.
---   4. CLAUDE.md rule 4: the owner/superuser role is only for migrations and
+--   4. non-negotiable rule 4: the owner/superuser role is only for migrations and
 --      trusted server-only jobs, never for user-facing routes.
 --
 -- ============================================================================
@@ -66,7 +66,7 @@
 --     cannot see, so the upsert's INSERT branch fails on the primary key.
 --     Multi-org membership is outside the single-org MVP; if it is needed,
 --     run the webhook through a separate server-only connection as the
---     owner/service role (allowed for webhooks by CLAUDE.md rule 4).
+--     owner/service role (allowed for webhooks by non-negotiable rule 4).
 --   - `prisma/seed.ts`: seeding runs through its own tenant transaction, or
 --     via `DIRECT_URL` as the owner role.
 --
@@ -82,7 +82,7 @@
 -- (-> master_formulas), batch_signatures (-> production_orders),
 -- sop_acknowledgments (-> sops).
 --
--- Append-only tables — batch_events (CLAUDE.md rule 1) and audit_log (the
+-- Append-only tables — batch_events (non-negotiable rule 1) and audit_log (the
 -- immutable audit trail) — get SELECT and INSERT policies only. With RLS
 -- enabled and forced and no UPDATE/DELETE policy, those commands affect zero
 -- rows for the runtime role regardless of table GRANTs. This is defense in
