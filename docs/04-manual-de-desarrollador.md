@@ -100,7 +100,7 @@ Estas reglas protegen el cumplimiento BPM. Un cambio que rompa una no se acepta.
   `BAD_REQUEST`...). Las rutas REST los traducen con `restError`.
 - **Textos de la interfaz** en español; nombres de código y comentarios en inglés.
 - **Diseño:** paleta, tipografía (Fira Sans / Fira Code), radios de 8 y 12 px,
-  sin sombras decorativas, espaciado en múltiplos de 8 (ver `CLAUDE.md`).
+  sin sombras decorativas, espaciado en múltiplos de 8 (ver `design-system/lab-qms/MASTER.md`).
 - **Decimales de Prisma** (`Decimal`) no cruzan al cliente: conviértalos con
   `Number()` en el Server Component.
 
