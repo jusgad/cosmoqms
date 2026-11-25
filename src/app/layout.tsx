@@ -27,7 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    // Sign-in stays on our own /login page (Clerk's hosted page lives on
+    // another domain and confuses people). Sign-up keeps Clerk's page: new
+    // accounts are rare and wait for an administrator anyway.
+    <ClerkProvider signInUrl="/login" signInFallbackRedirectUrl="/dashboard">
       <html lang="es" className={`${firaSans.variable} ${firaCode.variable}`}>
         <body className="bg-background font-sans text-foreground antialiased">
           <TRPCProvider>{children}</TRPCProvider>
