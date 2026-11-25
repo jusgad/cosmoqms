@@ -12,7 +12,13 @@ vi.mock("svix", () => ({
 }));
 
 const organizationUpsert = vi.fn(async (args: { create: { id: string; name: string } }) => args.create);
-const userUpsert = vi.fn(async (args: { create: unknown; update: Record<string, unknown> }) => args.create);
+type NewUser = { id: string; tenantId: string; role: string; active: boolean };
+let existingUser: { id: string } | null = null;
+let usersInTenant = 0;
+const userFindUnique = vi.fn(async () => existingUser);
+const userCount = vi.fn(async () => usersInTenant);
+const userCreate = vi.fn(async (args: { data: NewUser }) => args.data);
+const userUpdate = vi.fn(async (args: { where: unknown; data: Record<string, unknown> }) => args.data);
 const userUpdateMany = vi.fn(async (args: { where: unknown; data: unknown }) => {
   void args;
   return { count: 1 };
@@ -22,7 +28,13 @@ vi.mock("@/lib/db", () => ({
   withTenant: (_tenantId: string, _actorUserId: string, fn: (tx: unknown) => unknown) =>
     fn({
       organization: { upsert: organizationUpsert },
-      user: { upsert: userUpsert, updateMany: userUpdateMany },
+      user: {
+        findUnique: userFindUnique,
+        count: userCount,
+        create: userCreate,
+        update: userUpdate,
+        updateMany: userUpdateMany,
+      },
     }),
 }));
 
@@ -71,7 +83,10 @@ function userCreatedRequest(organizationMemberships: unknown[] | undefined): Req
 beforeEach(() => {
   process.env.CLERK_WEBHOOK_SECRET = "whsec_test";
   organizationUpsert.mockClear();
-  userUpsert.mockClear();
+  existingUser = null;
+  usersInTenant = 0;
+  userCreate.mockClear();
+  userUpdate.mockClear();
   getOrganizationList.mockReset();
   createOrganization.mockReset();
   createOrganizationMembership.mockReset();
@@ -153,14 +168,50 @@ describe("POST /api/webhooks/clerk — single-company auto-provisioning", () => 
     expect(getOrganizationList).not.toHaveBeenCalled();
     expect(createOrganization).not.toHaveBeenCalled();
     expect(createOrganizationMembership).not.toHaveBeenCalled();
-    expect(userUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({ create: expect.objectContaining({ id: "user_new", tenantId: "org_invited" }) }),
-    );
-    // The role comes from Clerk metadata only on creation; an existing user's
-    // role is managed (and audited) in /usuarios, never overwritten here.
-    const upsertArgs = userUpsert.mock.calls[0][0];
-    expect(upsertArgs.create).toMatchObject({ role: "calidad" });
-    expect(upsertArgs.update).not.toHaveProperty("role");
+    // A role an admin set in Clerk's metadata is honored, active.
+    expect(userCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ id: "user_new", tenantId: "org_invited", role: "calidad", active: true }),
+    });
+  });
+
+  function membershipEvent(publicMetadata: Record<string, unknown> = {}): Request {
+    return new Request("http://localhost/api/webhooks/clerk", {
+      method: "POST",
+      headers: SVIX_HEADERS,
+      body: JSON.stringify({
+        type: "organizationMembership.created",
+        data: {
+          organization: { id: "org_default", name: "CosmoQMS" },
+          public_user_data: { user_id: "user_new", identifier: "nueva@example.com", first_name: "Nueva", last_name: "Persona" },
+          public_metadata: publicMetadata,
+        },
+      }),
+    });
+  }
+
+  it("makes the company's first account its active administrator", async () => {
+    usersInTenant = 0;
+    expect((await POST(membershipEvent())).status).toBe(200);
+    expect(userCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ role: "admin", active: true }) });
+  });
+
+  it("creates everyone after the first one inactive, pending a role from the administrator", async () => {
+    usersInTenant = 3;
+    expect((await POST(membershipEvent())).status).toBe(200);
+    expect(userCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ active: false }) });
+  });
+
+  it("ignores a role that does not exist (the retired operario)", async () => {
+    usersInTenant = 3;
+    await POST(membershipEvent({ role: "operario" }));
+    expect(userCreate).toHaveBeenCalledWith({ data: expect.objectContaining({ active: false }) });
+  });
+
+  it("never overwrites the role of a user that already exists", async () => {
+    existingUser = { id: "user_new" };
+    await POST(membershipEvent({ role: "admin" }));
+    expect(userCreate).not.toHaveBeenCalled();
+    expect(userUpdate.mock.calls[0][0].data).not.toHaveProperty("role");
   });
 });
 
@@ -182,6 +233,6 @@ describe("POST /api/webhooks/clerk — user.updated", () => {
       where: { id: "user_1", tenantId: "org_default" },
       data: { mfaEnabled: true },
     });
-    expect(userUpsert).not.toHaveBeenCalled();
+    expect(userCreate).not.toHaveBeenCalled();
   });
 });

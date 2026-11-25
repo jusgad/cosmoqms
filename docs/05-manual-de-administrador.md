@@ -105,11 +105,17 @@ Al terminar, `db`, `cosmoqms`, `backup` y `caddy` deben verse `Up (healthy)`, y
 
 ### 3.5 Primer administrador
 
-Todo usuario nuevo entra como **Operario**. Después de registrarse la persona
-que será administradora, nómbrela una sola vez desde la consola:
+La **primera cuenta** que se registra en la empresa queda como **Administrador**,
+activa. Regístrese usted primero. Todas las cuentas que lleguen después quedan
+**pendientes** (inactivas) hasta que usted les asigne uno de los 5 roles en
+**Usuarios** y las active.
+
+Si por alguna razón la primera cuenta no quedó como administradora (por
+ejemplo, porque se cargó una base de datos con usuarios), nómbrela una sola vez
+desde la consola:
 
 ```bash
-docker compose exec db psql -U cosmoqms_app -d cosmoqms -c "update users set role = 'admin' where email = '<correo>'"
+docker compose exec db psql -U cosmoqms_app -d cosmoqms -c "update users set role = 'admin', active = true where email = '<correo>'"
 ```
 
 Desde ese momento todos los roles se asignan en la pantalla **Usuarios**.
@@ -130,8 +136,9 @@ archivo de evidencia que genera el script.
 
 | Acción | Cómo |
 |---|---|
-| Alta | La persona se registra en la app; aparece en **Usuarios** como Operario |
-| Asignar rol | **Usuarios** → elegir el rol en la lista → confirmar |
+| Alta | La persona se registra en la app; aparece en **Usuarios** como **Inactivo o pendiente**, sin acceso |
+| Asignar rol y dar acceso | **Usuarios** → elegir el rol en la lista (jefe de planta, bodega, calidad, director técnico o administrador) → confirmar → **Reactivar** |
+| Cambiar rol | **Usuarios** → elegir el rol en la lista → confirmar |
 | Baja o retiro | **Usuarios** → **Desactivar** (el acceso se corta de inmediato) |
 | Reactivar | **Usuarios** → **Reactivar** |
 | Verificar MFA | **Usuarios** muestra "MFA activo" en cada cuenta que lo tiene |
@@ -147,8 +154,8 @@ Reglas:
 - Si la organización está llena, una persona nueva ve en Clerk la pantalla "Set up your organization"
   y no entra a CosmoQMS (no debe crear una organización ahí). Para darle cupo: desactive en **Usuarios**
   a quien ya no trabaja, sáquelo de la organización en el panel de Clerk (**Organizations → Members**) y
-  agregue a la persona nueva desde ese mismo panel; el webhook la crea en CosmoQMS como Operario y usted
-  le asigna el rol. Con más de 5 personas, amplíe el plan de Clerk. La cuenta desactivada se conserva
+  agregue a la persona nueva desde ese mismo panel; el webhook la crea en CosmoQMS pendiente y usted
+  le asigna el rol y la activa. Con más de 5 personas, amplíe el plan de Clerk. La cuenta desactivada se conserva
   en CosmoQMS porque su historial es parte de la auditoría.
 - Nadie cambia su propio acceso: un administrador no puede modificar su
   propia cuenta, lo hace otro administrador. Mantenga al menos dos administradores.

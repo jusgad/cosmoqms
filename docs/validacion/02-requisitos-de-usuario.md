@@ -4,7 +4,7 @@ Versión 1.0 · Ver [plan maestro](01-plan-maestro-validacion.md) para criterios
 
 | ID | Requisito | Riesgo |
 |---|---|---|
-| URS-01 | Cada persona entra con su propio usuario y contraseña; el sistema ofrece MFA. Hay seis roles (operario, jefe de planta, bodega, calidad, director técnico, administrador) y cada uno ve y hace solo lo de su función. El administrador supervisa todos los módulos en solo lectura, consulta la matriz de roles y hace la revisión periódica de accesos; no opera producción ni calidad (no recibe, pesa, firma, libera ni aprueba). | Alto |
+| URS-01 | Cada persona entra con su propio usuario y contraseña; el sistema ofrece MFA. Hay cinco roles (jefe de planta, bodega, calidad, director técnico, administrador); el jefe de planta hace el trabajo de planta (pesaje, firmas de producción y desviaciones). Una cuenta nueva queda pendiente, sin acceso, hasta que el administrador le asigna el rol y cada uno ve y hace solo lo de su función. El administrador supervisa todos los módulos en solo lectura, consulta la matriz de roles y hace la revisión periódica de accesos; no opera producción ni calidad (no recibe, pesa, firma, libera ni aprueba). | Alto |
 | URS-02 | Los datos de una empresa nunca son visibles para otra. El aislamiento se aplica también en la base de datos (Row Level Security), no solo en la aplicación. | Alto |
 | URS-03 | Toda materia prima recibida queda en **cuarentena** con un código interno único (QR), proveedor, cantidad, vencimiento y certificado de análisis (COA) adjunto. | Alto |
 | URS-04 | Solo bodega o calidad liberan o rechazan un lote de materia prima, y solo desde cuarentena. Solo los lotes liberados se pueden usar en el pesaje. | Alto |

@@ -80,7 +80,7 @@ describe("uploadAttachment", () => {
 
   it("classifies uploads on a production order as evidence", async () => {
     const attachment = await uploadAttachment({
-      user: user("operario"),
+      user: user("jefe_planta"),
       entityType: "production_order",
       entityId: LOT_ID,
       fileName: "mezcla.png",
@@ -94,7 +94,7 @@ describe("uploadAttachment", () => {
     const storage = memoryStorage();
     expect(
       await statusOf(
-        uploadAttachment({ user: user("operario"), entityType: "raw_material_lot", entityId: LOT_ID, fileName: "a.pdf", bytes: PDF, storage }),
+        uploadAttachment({ user: user("jefe_planta"), entityType: "raw_material_lot", entityId: LOT_ID, fileName: "a.pdf", bytes: PDF, storage }),
       ),
     ).toBe(403);
     expect(storage.put).not.toHaveBeenCalled();
@@ -153,7 +153,7 @@ describe("readAttachment", () => {
     const storage = memoryStorage();
     expect(await statusOf(readAttachment({ user: user("calidad"), id: "nope", storage }))).toBe(404);
 
-    storedAttachment = { id: "att1", entityType: "raw_material_lot", storageKey: "t1/x.pdf" };
-    expect(await statusOf(readAttachment({ user: user("operario"), id: "att1", storage }))).toBe(404);
+    storedAttachment = { id: "att1", entityType: "production_order", storageKey: "t1/x.pdf" };
+    expect(await statusOf(readAttachment({ user: user("bodega"), id: "att1", storage }))).toBe(404);
   });
 });

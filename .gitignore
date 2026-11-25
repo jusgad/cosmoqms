@@ -49,3 +49,7 @@ CLAUDE.md
 
 # material del trabajo final del SENA (no es parte del sistema)
 SENA/
+
+# Copias de la base de datos (tienen datos del laboratorio)
+*.dump
+/adjuntos.tar.gz

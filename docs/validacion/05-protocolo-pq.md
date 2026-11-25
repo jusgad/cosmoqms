@@ -28,7 +28,7 @@ real o simulada y su cierre.
 | Criterio | Lote 1 | Lote 2 | Lote 3 |
 |---|---|---|---|
 | PQ-01 · Recepción y liberación de cada materia prima con COA adjunto | | | |
-| PQ-02 · Pesajes coinciden con el registro en papel (lote, cantidad, operario) | | | |
+| PQ-02 · Pesajes coinciden con el registro en papel (lote, cantidad, persona que pesó) | | | |
 | PQ-03 · Ningún pesaje duplicado ni perdido, también los hechos sin señal | | | |
 | PQ-04 · Cada etapa firmada por el rol correcto, con reautenticación | | | |
 | PQ-05 · Resultados de QC y veredictos coinciden con el certificado del laboratorio | | | |

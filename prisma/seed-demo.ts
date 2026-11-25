@@ -29,7 +29,8 @@ const PREFIX = IS_DEMO_TENANT ? "demo" : `hist-${TENANT.slice(-8).toLowerCase()}
 const DEMO_USER = IS_DEMO_TENANT ? "demo-user" : `${PREFIX}-director`;
 const CALIDAD = `${PREFIX}-calidad`;
 const JEFE = `${PREFIX}-jefe`;
-const OPERARIO = `${PREFIX}-operario`;
+// Id kept from when this was the operario account, so re-seeding updates it.
+const PLANTA = `${PREFIX}-operario`;
 const BODEGA = `${PREFIX}-bodega`;
 const DAY = 24 * 60 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -38,7 +39,7 @@ const STAFF: { id: string; role: Role; fullName: string; email: string }[] = [
   { id: DEMO_USER, role: "director_tecnico", fullName: IS_DEMO_TENANT ? "Usuario Demo" : "Diego Director (histórico)", email: IS_DEMO_TENANT ? "demo@cosmoqms.local" : "director.historico@cosmoqms.local" },
   { id: CALIDAD, role: "calidad", fullName: "Beatriz Calidad", email: IS_DEMO_TENANT ? "calidad@cosmoqms.local" : "calidad.historico@cosmoqms.local" },
   { id: JEFE, role: "jefe_planta", fullName: "Carlos Jefe de Planta", email: IS_DEMO_TENANT ? "jefe.planta@cosmoqms.local" : "jefe.historico@cosmoqms.local" },
-  { id: OPERARIO, role: "operario", fullName: "Ana Operaria", email: IS_DEMO_TENANT ? "operario@cosmoqms.local" : "operario.historico@cosmoqms.local" },
+  { id: PLANTA, role: "jefe_planta", fullName: "Ana Martínez", email: IS_DEMO_TENANT ? "planta@cosmoqms.local" : "planta.historico@cosmoqms.local" },
   { id: BODEGA, role: "bodega", fullName: "Elena Bodega", email: IS_DEMO_TENANT ? "bodega@cosmoqms.local" : "bodega.historico@cosmoqms.local" },
 ];
 
@@ -259,7 +260,7 @@ async function main(): Promise<void> {
               theoreticalQty: (percentage / 100) * plan.quantity,
               actualQty: Math.round((percentage / 100) * plan.quantity * 1000) / 1000,
             },
-            actorUserId: OPERARIO,
+            actorUserId: PLANTA,
             occurredAt: start,
             clientEventId: randomUUID(),
           },
@@ -275,7 +276,7 @@ async function main(): Promise<void> {
         const signedAt = new Date(cursor);
         const finalDecision = stage === "calidad" ? (plan.status === "liberado" || plan.status === "rechazado" ? plan.status : null) : null;
         const signatureStage = finalDecision ?? stage;
-        const signer = stage === "calidad" ? DEMO_USER : OPERARIO;
+        const signer = stage === "calidad" ? DEMO_USER : PLANTA;
         const signature = await tx.batchSignature.create({
           data: {
             productionOrderId: order.id,
@@ -334,7 +335,7 @@ async function main(): Promise<void> {
             productionOrderId: order.id,
             description: plan.deviation.description,
             status: plan.deviation.status,
-            raisedBy: OPERARIO,
+            raisedBy: PLANTA,
             investigationStartedBy: investigating ? CALIDAD : null,
             investigationStartedAt: investigating ? new Date(start.getTime() + 6 * HOUR) : null,
             investigation: investigating ? "Revisión del registro de lote, condiciones de proceso y materias primas del lote." : null,

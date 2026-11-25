@@ -10,15 +10,14 @@ import type { Role } from "@prisma/client";
 export { ROLE_LABELS } from "@/lib/validation/users";
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  operario: "Pesa materias primas, firma sus etapas y reporta desviaciones desde la planta.",
-  jefe_planta: "Crea fórmulas y órdenes de producción; también pesa y firma etapas.",
+  jefe_planta: "Crea fórmulas y órdenes; en planta pesa, firma pesado, mezclado y envasado, y reporta desviaciones.",
   bodega: "Mantiene el catálogo, recibe lotes de materia prima y los deja en cuarentena.",
   calidad: "Libera materia prima, define especificaciones, registra QC, investiga desviaciones y redacta SOPs.",
   director_tecnico: "Responsable ante el INVIMA: libera o rechaza lotes y aprueba desviaciones y SOPs.",
   admin: "Gestiona usuarios, roles y datos de la empresa. Supervisa todos los módulos en solo lectura y no firma.",
 };
 
-export const ROLE_ORDER: Role[] = ["operario", "jefe_planta", "bodega", "calidad", "director_tecnico", "admin"];
+export const ROLE_ORDER: Role[] = ["jefe_planta", "bodega", "calidad", "director_tecnico", "admin"];
 
 export type Capability = { action: string; roles: Role[] };
 export type CapabilityGroup = { module: string; capabilities: Capability[] };
@@ -46,11 +45,11 @@ export const CAPABILITIES: CapabilityGroup[] = [
   {
     module: "Producción",
     capabilities: [
-      { action: "Ver órdenes y batch record", roles: ["jefe_planta", "operario", "calidad", "director_tecnico", "admin"] },
+      { action: "Ver órdenes y batch record", roles: ["jefe_planta", "calidad", "director_tecnico", "admin"] },
       { action: "Crear orden de producción", roles: ["jefe_planta"] },
-      { action: "Registrar pesaje (también sin internet)", roles: ["operario", "jefe_planta"] },
-      { action: "Firmar etapas de pesado, mezclado y envasado", roles: ["operario", "jefe_planta"] },
-      { action: "Reportar desviación", roles: ["operario", "jefe_planta", "calidad"] },
+      { action: "Registrar pesaje (también sin internet)", roles: ["jefe_planta"] },
+      { action: "Firmar etapas de pesado, mezclado y envasado", roles: ["jefe_planta"] },
+      { action: "Reportar desviación", roles: ["jefe_planta", "calidad"] },
       { action: "Descargar batch record en PDF", roles: ["calidad", "director_tecnico", "admin"] },
     ],
   },
@@ -68,8 +67,8 @@ export const CAPABILITIES: CapabilityGroup[] = [
     module: "Trazabilidad, reportes y SOPs",
     capabilities: [
       { action: "Consultar trazabilidad y reporte BPM", roles: ["calidad", "director_tecnico", "admin"] },
-      { action: "Leer SOPs vigentes", roles: ["operario", "jefe_planta", "bodega", "calidad", "director_tecnico", "admin"] },
-      { action: "Confirmar lectura de un SOP", roles: ["operario", "jefe_planta", "bodega", "calidad", "director_tecnico"] },
+      { action: "Leer SOPs vigentes", roles: ["jefe_planta", "bodega", "calidad", "director_tecnico", "admin"] },
+      { action: "Confirmar lectura de un SOP", roles: ["jefe_planta", "bodega", "calidad", "director_tecnico"] },
       { action: "Redactar SOP o nueva versión", roles: ["calidad", "director_tecnico"] },
       { action: "Aprobar SOP como vigente", roles: ["director_tecnico"] },
     ],

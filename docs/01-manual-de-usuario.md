@@ -6,13 +6,15 @@ el [procedimiento de firma electrónica (SOP-SIS-001)](procedimientos/SOP-SIS-00
 ## Contenido
 
 1. [Lo básico](#1-lo-básico) — entrar, el menú, sin señal, notificaciones, firmar
-2. [Operario](#2-operario)
-3. [Jefe de planta](#3-jefe-de-planta)
-4. [Bodega](#4-bodega)
-5. [Calidad](#5-calidad)
-6. [Director técnico](#6-director-técnico)
-7. [Administrador](#7-administrador)
-8. [Problemas frecuentes](#8-problemas-frecuentes)
+2. [Jefe de planta](#2-jefe-de-planta) — también hace el trabajo de planta: pesaje, firmas y desviaciones
+3. [Bodega](#3-bodega)
+4. [Calidad](#4-calidad)
+5. [Director técnico](#5-director-técnico)
+6. [Administrador](#6-administrador)
+7. [Problemas frecuentes](#7-problemas-frecuentes)
+
+CosmoQMS trabaja con **5 roles**: jefe de planta, bodega, calidad, director
+técnico y administrador.
 
 ---
 
@@ -22,7 +24,8 @@ el [procedimiento de firma electrónica (SOP-SIS-001)](procedimientos/SOP-SIS-00
 
 1. Abra la dirección de CosmoQMS en el navegador de la tableta, el celular o el computador.
 2. Ingrese su correo y contraseña. Si tiene MFA, escriba el código de su aplicación autenticadora.
-3. La primera vez su cuenta queda como **Operario**. El administrador le asigna el rol de su cargo.
+3. La primera vez su cuenta queda **pendiente** y ve "Sin acceso a CosmoQMS". El administrador le asigna
+   el rol de su cargo y la activa; después pulse **Intentar de nuevo**.
 
 Su cuenta es personal. Nunca entre con la cuenta de otra persona ni comparta la suya.
 
@@ -61,8 +64,8 @@ Arriba del **Dashboard** están los botones de lo que más hace su rol: por ejem
 ### Mis pendientes
 
 En el **Dashboard**, el recuadro **Mis pendientes** muestra lo que espera por
-su rol, con un enlace a donde se hace: por ejemplo, al operario las órdenes por
-pesar; a calidad los lotes en cuarentena y las órdenes por analizar; al
+su rol, con un enlace a donde se hace: por ejemplo, al jefe de planta las órdenes por
+pesar y las etapas por firmar; a calidad los lotes en cuarentena y las órdenes por analizar; al
 director técnico los lotes listos para liberar. Si dice "Todo al día", no tiene
 nada pendiente.
 
@@ -83,9 +86,12 @@ si se equivocó, avise a su jefe para registrar una desviación.
 
 ---
 
-## 2. Operario
+## 2. Jefe de planta
 
-### Registrar un pesaje
+Crea las fórmulas y las órdenes de producción, y hace el trabajo de planta:
+pesa, firma las etapas de pesado, mezclado y envasado, y reporta desviaciones.
+
+### Planta: registrar un pesaje
 
 1. **Producción** → pulse la tarjeta de la orden.
 2. Pulse **Registrar pesaje**.
@@ -102,7 +108,7 @@ si se equivocó, avise a su jefe para registrar una desviación.
    sistema no deja registrar más de lo disponible: complete con otro lote de
    la misma materia prima.
 
-### Firmar una etapa
+### Planta: firmar una etapa
 
 Cuando todos los ingredientes están pesados (o la etapa de mezclado o envasado
 terminó), en la orden aparece **Firmar**:
@@ -111,7 +117,7 @@ terminó), en la orden aparece **Firmar**:
    *"Confirmo que realicé el pesaje conforme a la fórmula maestra"*.
 2. **Verificar identidad** → **Firmar**. La orden pasa a la siguiente etapa.
 
-### Reportar una desviación
+### Planta: reportar una desviación
 
 Si algo no sale como dice el procedimiento (derrame, equipo, cantidad fuera de
 tolerancia):
@@ -120,17 +126,12 @@ tolerancia):
 2. Describa qué ocurrió, cuándo y en qué etapa. Pulse **Reportar desviación**.
 3. Calidad recibe el aviso y la investiga.
 
-### Adjuntar evidencia y leer SOPs
+### Planta: adjuntar evidencia y leer SOPs
 
 - En la orden, sección de evidencias: elija el archivo (foto o PDF) y pulse **Subir**.
 - **SOPs**: los que dicen **Pendiente de leer** debe abrirlos, leer el
   documento y pulsar **Confirmar lectura**.
 
----
-
-## 3. Jefe de planta
-
-Hace todo lo del operario y además:
 
 ### Crear una fórmula maestra
 
@@ -165,7 +166,7 @@ Una fórmula activa no se modifica. Para cambiarla:
 
 ---
 
-## 4. Bodega
+## 3. Bodega
 
 ### Mantener el catálogo de materias primas
 
@@ -226,7 +227,7 @@ los **vencidos**, los de **stock bajo** (menos del 10 % de lo recibido) y los
 
 ---
 
-## 5. Calidad
+## 4. Calidad
 
 ### Liberar o rechazar materia prima
 
@@ -297,7 +298,7 @@ validación de calidad de este lote"*).
 
 ---
 
-## 6. Director técnico
+## 5. Director técnico
 
 Ve todos los módulos de calidad y además:
 
@@ -329,7 +330,7 @@ resultado en CSV.
 
 ---
 
-## 7. Administrador
+## 6. Administrador
 
 El administrador gestiona los accesos y los datos de la empresa, y supervisa
 el sistema. Entra a **todos los módulos en modo supervisión (solo lectura)**:
@@ -340,12 +341,15 @@ le aparecen y el servidor rechaza esas acciones si las intenta.
 ### Usuarios
 
 1. **Usuarios** muestra a cada persona con su correo, rol y si tiene **MFA activo**.
-2. Para cambiar el rol, elíjalo en la lista y confirme.
-3. **Desactivar** quita el acceso de inmediato (retiro, cambio de cargo,
+2. Una persona nueva aparece **Inactiva o pendiente**: elija su rol en la lista (uno de los 5) y
+   pulse **Reactivar** para darle acceso. Solo la primera cuenta de la empresa entra sola, como
+   administrador.
+3. Para cambiar el rol de alguien, elíjalo en la lista y confirme.
+4. **Desactivar** quita el acceso de inmediato (retiro, cambio de cargo,
    pérdida de credenciales); **Reactivar** lo devuelve.
-4. Usted no puede cambiar su propio acceso: lo hace otro administrador.
-5. Cada cambio queda en **Auditoría** (tabla User).
-6. Arriba aparecen los **cupos de Clerk** usados. Si la organización está llena, una persona nueva no
+5. Usted no puede cambiar su propio acceso: lo hace otro administrador.
+6. Cada cambio queda en **Auditoría** (tabla User).
+7. Arriba aparecen los **cupos de Clerk** usados. Si la organización está llena, una persona nueva no
    puede entrar: siga el manual de administrador (§4) para liberar un cupo.
 
 ### Roles y permisos
@@ -377,11 +381,11 @@ aparecen en el reporte BPM, en el batch record y en las etiquetas. Pulse
 
 ---
 
-## 8. Problemas frecuentes
+## 7. Problemas frecuentes
 
 | Situación | Qué hacer |
 |---|---|
-| "Sin acceso a CosmoQMS" | Su cuenta está desactivada o recién creada. Espere unos segundos y pulse **Intentar de nuevo**; si sigue, avise al administrador |
+| "Sin acceso a CosmoQMS" | Su cuenta está pendiente (recién creada) o desactivada. Avise al administrador para que le asigne su rol y la active; luego pulse **Intentar de nuevo** |
 | No aparece el lote para pesar | El lote no está liberado, está vencido, se agotó o no es de una materia prima de la fórmula. Avise a calidad o a bodega |
 | El botón **Firmar** no se activa | Falta **Verificar identidad**, o en la etapa pesado faltan ingredientes por pesar |
 | El indicador dice que hay eventos pendientes | No tiene señal. Siga trabajando; se envían solos al reconectar. No cierre sesión |

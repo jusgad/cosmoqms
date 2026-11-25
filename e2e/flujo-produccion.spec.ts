@@ -4,7 +4,7 @@ import { asRole, expectHeading, failOnPageErrors, trpcCall, uniqueSuffix } from 
 // The BPM flow end to end, each step by the role that owns it:
 // receive raw material (bodega) -> release lots (calidad) -> master formula
 // (jefe_planta) -> activate it at 100% (calidad) -> production order
-// (jefe_planta) -> weighing every ingredient (operario) -> electronic
+// (jefe_planta) -> weighing every ingredient (jefe_planta, who does the plant work) -> electronic
 // signature, which must demand re-authentication (CLAUDE.md rule 3).
 
 test.describe.configure({ mode: "serial" });
@@ -103,8 +103,8 @@ test("jefe de planta crea la orden de producción", async ({ page, context }) =>
   orderId = page.url().split("/").pop()!;
 });
 
-test("operario pesa cada ingrediente con el lote liberado", async ({ page, context }) => {
-  await asRole(context, "operario");
+test("jefe de planta pesa cada ingrediente con el lote liberado", async ({ page, context }) => {
+  await asRole(context, "jefe_planta");
   for (const lot of lots) {
     await page.goto(`/produccion/${orderId}`);
     await page.getByRole("link", { name: /Registrar pesaje/ }).click();
@@ -130,7 +130,7 @@ test("operario pesa cada ingrediente con el lote liberado", async ({ page, conte
 });
 
 test("la firma electrónica exige reautenticación (regla 3)", async ({ page, context, request }) => {
-  await asRole(context, "operario");
+  await asRole(context, "jefe_planta");
   await page.goto(`/produccion/${orderId}`);
   await page.getByRole("link", { name: "Firmar" }).click();
   await expectHeading(page, /Firma electrónica/);
@@ -138,7 +138,7 @@ test("la firma electrónica exige reautenticación (regla 3)", async ({ page, co
   await expect(page.getByRole("button", { name: "Firmar" })).toBeDisabled();
 
   // Even sending reauthVerified=true by hand, the server re-checks with Clerk.
-  const forged = await trpcCall(request, "operario", "production.sign", {
+  const forged = await trpcCall(request, "jefe_planta", "production.sign", {
     productionOrderId: orderId,
     stage: "pesado",
     meaningStatement: "Confirmo el pesaje",
@@ -147,6 +147,6 @@ test("la firma electrónica exige reautenticación (regla 3)", async ({ page, co
   expect(forged.status).toBe(401);
   expect(forged.error?.data.code).toBe("UNAUTHORIZED");
 
-  const order = await trpcCall(request, "operario", "production.getById", { id: orderId }, "query");
+  const order = await trpcCall(request, "jefe_planta", "production.getById", { id: orderId }, "query");
   expect((order.result as { status: string }).status).toBe("pesado");
 });

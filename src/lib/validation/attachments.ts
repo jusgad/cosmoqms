@@ -26,14 +26,14 @@ export const KIND_FOR_ENTITY = {
 // client-bundle safe; the service enforces these server-side.
 export const UPLOAD_ROLES: Record<AttachmentEntityType, readonly string[]> = {
   raw_material_lot: ["bodega", "calidad"],
-  production_order: ["operario", "jefe_planta", "calidad"],
+  production_order: ["jefe_planta", "calidad"],
   sop: ["calidad", "director_tecnico"],
 };
 
 export const VIEW_ROLES: Record<AttachmentEntityType, readonly string[]> = {
   raw_material_lot: ["bodega", "jefe_planta", "calidad", "director_tecnico", "admin"],
-  production_order: ["operario", "jefe_planta", "calidad", "director_tecnico", "admin"],
-  sop: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"],
+  production_order: ["jefe_planta", "calidad", "director_tecnico", "admin"],
+  sop: ["jefe_planta", "calidad", "director_tecnico", "bodega"],
 };
 
 export const uploadAttachmentFields = z.object({

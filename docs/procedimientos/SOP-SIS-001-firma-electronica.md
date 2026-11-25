@@ -58,7 +58,7 @@ se archiva en su carpeta de personal:
    (contraseña o MFA) inmediatamente antes de firmar. El botón "Firmar" no se
    activa sin esa verificación, y el servidor la vuelve a comprobar.
 7. **Roles.** Cada etapa la firma solo el rol autorizado: las etapas de
-   producción, operario o jefe de planta; la etapa de calidad, calidad o
+   producción (pesado, mezclado y envasado), el jefe de planta; la etapa de calidad, calidad o
    director técnico; la liberación o rechazo del lote y la aprobación de SOPs,
    solo el director técnico.
 8. **Errores.** Una firma no se borra ni se edita. Si una firma fue un error,

@@ -33,7 +33,6 @@ const prisma = new PrismaClient();
 const ORG_ID = "seed-org-1";
 
 const USER_IDS: Record<Role, string> = {
-  operario: "seed-user-operario",
   jefe_planta: "seed-user-jefe-planta",
   calidad: "seed-user-calidad",
   director_tecnico: "seed-user-director-tecnico",
@@ -83,7 +82,6 @@ async function main(): Promise<void> {
     });
 
     const usersByRole: { role: Role; fullName: string; email: string }[] = [
-      { role: "operario", fullName: "Ana Operaria", email: "operario@cosmolab.demo" },
       { role: "jefe_planta", fullName: "Carlos Jefe de Planta", email: "jefe.planta@cosmolab.demo" },
       { role: "calidad", fullName: "Beatriz Calidad", email: "calidad@cosmolab.demo" },
       { role: "director_tecnico", fullName: "Diego Director Tecnico", email: "director.tecnico@cosmolab.demo" },

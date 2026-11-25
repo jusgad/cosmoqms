@@ -254,7 +254,7 @@ export function WeighingForm({
         {scanError && <p className="text-sm text-destructive">{scanError}</p>}
         {/* Task-10 review round 1 fix: a FORBIDDEN/network failure must be
             visible, not look identical to "no lots in inventory" — otherwise
-            a future permission regression (like the operario-role gap this
+            a future permission regression (like the weighing-role gap this
             same review found) silently hides itself behind an empty-state
             message. */}
         {lotsQuery.isError && (

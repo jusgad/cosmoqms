@@ -276,7 +276,7 @@ paths:
       summary: Adjuntar un archivo
       description: |
         COA de un lote de materia prima (bodega, calidad), evidencia de una
-        orden (operario, jefe_planta, calidad) o documento de un SOP en
+        orden (jefe_planta, calidad) o documento de un SOP en
         borrador (calidad, director_tecnico). PDF, PNG, JPEG o WebP de hasta
         10 MB; el servidor verifica el tipo real del archivo. Los adjuntos no
         se reemplazan ni se borran.

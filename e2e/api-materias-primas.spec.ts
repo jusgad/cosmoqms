@@ -52,7 +52,7 @@ test("errores: validación 400, duplicado 409 y borrado con historial 409", asyn
 
 test("un rol sin permiso de escritura recibe 403", async ({ request }) => {
   const attempt = await request.post(BASE, {
-    headers: roleHeaders("operario"),
+    headers: roleHeaders("calidad"),
     data: { code: `MP-NO-${uniqueSuffix()}`, name: "No autorizado", unit: "kg" },
   });
   expect(attempt.status()).toBe(403);

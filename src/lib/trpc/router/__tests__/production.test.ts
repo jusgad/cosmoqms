@@ -18,7 +18,7 @@ vi.mock("@/lib/db", () => ({
 import { productionRouter } from "../production";
 import { TRPCError } from "@trpc/server";
 
-const caller = (role: "jefe_planta" | "operario" = "jefe_planta") =>
+const caller = (role: "jefe_planta" = "jefe_planta") =>
   productionRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
 
 describe("production.create", () => {
@@ -75,7 +75,7 @@ describe("production.create", () => {
 
 describe("production.list", () => {
   it("filters by the caller's tenant explicitly", async () => {
-    await caller("operario").list();
+    await caller("jefe_planta").list();
     expect(productionOrderFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { tenantId: "t1" } }),
     );

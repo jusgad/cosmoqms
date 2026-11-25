@@ -6,11 +6,11 @@ import { asRole, expectHeading, failOnPageErrors, type Role } from "./helpers";
 // the role redirect away. The admin opens every module in read-only mode.
 
 const PAGES: Record<string, { title: string | RegExp; roles: Role[] }> = {
-  "/dashboard": { title: "Dashboard", roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
+  "/dashboard": { title: "Dashboard", roles: ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
   "/materias-primas": { title: "Materias Primas", roles: ["bodega", "jefe_planta", "calidad", "director_tecnico", "admin"] },
   "/materias-primas/catalogo": { title: "Catálogo de materias primas", roles: ["bodega", "jefe_planta", "calidad", "director_tecnico", "admin"] },
   "/formulas": { title: "Fórmulas Maestras", roles: ["jefe_planta", "calidad", "director_tecnico", "admin"] },
-  "/produccion": { title: "Producción", roles: ["jefe_planta", "operario", "calidad", "director_tecnico", "admin"] },
+  "/produccion": { title: "Producción", roles: ["jefe_planta", "calidad", "director_tecnico", "admin"] },
   "/calidad": { title: "Control de Calidad", roles: ["calidad", "director_tecnico", "admin"] },
   "/trazabilidad": { title: "Trazabilidad", roles: ["calidad", "director_tecnico", "admin"] },
   "/reportes": { title: "Reportes", roles: ["calidad", "director_tecnico", "admin"] },
@@ -19,11 +19,11 @@ const PAGES: Record<string, { title: string | RegExp; roles: Role[] }> = {
   "/usuarios/revision": { title: "Revisión de accesos", roles: ["admin"] },
   "/roles": { title: "Roles y permisos", roles: ["admin"] },
   "/configuracion": { title: "Configuración", roles: ["admin"] },
-  "/sops": { title: "SOPs", roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
-  "/notificaciones": { title: "Notificaciones", roles: ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
+  "/sops": { title: "SOPs", roles: ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
+  "/notificaciones": { title: "Notificaciones", roles: ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] },
 };
 
-const ROLES: Role[] = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
+const ROLES: Role[] = ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
 
 for (const role of ROLES) {
   test(`${role}: ve sus páginas y no las de otros roles`, async ({ page, context }) => {

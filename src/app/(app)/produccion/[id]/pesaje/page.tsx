@@ -9,7 +9,7 @@ export default async function PesajePage({ params }: { params: Promise<{ id: str
   if (!user) {
     redirect("/login");
   }
-  if (user.role !== "operario" && user.role !== "jefe_planta") {
+  if (user.role !== "jefe_planta") {
     redirect(`/produccion/${id}`);
   }
 

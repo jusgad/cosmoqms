@@ -26,7 +26,7 @@ export type CurrentUser = { id: string; tenantId: string; role: Role };
 // can act as every role; it is only read inside demo mode, which is itself
 // limited to localhost. An unknown value falls back instead of inventing a role.
 export const DEMO_ROLE_COOKIE = "cosmoqms-demo-role";
-const DEMO_ROLES: readonly Role[] = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
+const DEMO_ROLES: readonly Role[] = ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"];
 function toDemoRole(value: string | undefined): Role | undefined {
   return DEMO_ROLES.find((role) => role === value);
 }

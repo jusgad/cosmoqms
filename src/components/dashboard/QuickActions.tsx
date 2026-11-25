@@ -5,7 +5,6 @@ import {
   BookOpen,
   Boxes,
   ClipboardList,
-  Factory,
   FileBarChart,
   FlaskConical,
   KeyRound,
@@ -32,13 +31,9 @@ const ACTIONS: Record<Role, Action[]> = {
     { label: "Catálogo", href: "/materias-primas/catalogo", icon: ClipboardList },
     { label: "SOPs", href: "/sops", icon: BookOpen },
   ],
-  operario: [
-    { label: "Órdenes de producción", href: "/produccion", icon: Scale, primary: true },
-    { label: "SOPs por leer", href: "/sops", icon: BookOpen },
-  ],
   jefe_planta: [
     { label: "Nueva orden", href: "/produccion/nueva", icon: Plus, primary: true },
-    { label: "Tablero de producción", href: "/produccion", icon: Factory },
+    { label: "Pesaje y firmas de planta", href: "/produccion", icon: Scale },
     { label: "Nueva fórmula", href: "/formulas/nueva", icon: FlaskConical },
     { label: "Lotes disponibles", href: "/materias-primas", icon: Boxes },
   ],

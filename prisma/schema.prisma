@@ -33,7 +33,6 @@ model Organization {
 }
 
 enum Role {
-  operario
   jefe_planta
   calidad
   director_tecnico

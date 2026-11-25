@@ -24,10 +24,10 @@ function makeTx(overrides: { orderCount?: number; qualityOrders?: { signatures: 
 }
 
 describe("loadPendingTasks", () => {
-  it("gives the operator weighing and signing work, scoped to the tenant", async () => {
+  it("gives the jefe de planta weighing, signing and draft formulas, scoped to the tenant", async () => {
     const { tx, count } = makeTx();
-    const tasks = await loadPendingTasks(tx, "t1", "operario", "u1");
-    expect(tasks.map((task) => task.key)).toEqual(["pesar", "firmar", "leer"]);
+    const tasks = await loadPendingTasks(tx, "t1", "jefe_planta", "u1");
+    expect(tasks.map((task) => task.key)).toEqual(["pesar", "firmar", "borradores", "leer"]);
     expect(count).toHaveBeenCalledWith({ where: { tenantId: "t1", status: { in: ["planificado", "pesado"] } } });
   });
 

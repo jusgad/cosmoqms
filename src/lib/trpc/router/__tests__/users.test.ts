@@ -24,7 +24,7 @@ vi.mock("@/lib/db", () => ({
 
 import { usersRouter } from "../users";
 
-type Role = "operario" | "calidad" | "admin" | "director_tecnico";
+type Role = "bodega" | "calidad" | "admin" | "director_tecnico";
 const caller = (user: { id: string; tenantId: string; role: Role } | null) =>
   usersRouter.createCaller({ user, prisma: {} as never });
 
@@ -33,7 +33,7 @@ const admin = { id: "admin-1", tenantId: "t1", role: "admin" as const };
 describe("users router", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    stored = { id: "u2", tenantId: "t1", fullName: "Ana Pérez", email: "ana@lab.co", role: "operario", active: true };
+    stored = { id: "u2", tenantId: "t1", fullName: "Ana Pérez", email: "ana@lab.co", role: "bodega", active: true };
   });
 
   it("requires a session and the admin role", async () => {
@@ -60,7 +60,7 @@ describe("users router", () => {
         tableName: "User",
         recordId: "u2",
         action: "update",
-        beforeData: { role: "operario", active: true },
+        beforeData: { role: "bodega", active: true },
         afterData: { role: "calidad", active: true },
         actorUserId: "admin-1",
       }),
@@ -70,14 +70,14 @@ describe("users router", () => {
 
   it("deactivates a user and audits it", async () => {
     await caller(admin).update({ id: "u2", active: false });
-    expect(updateMany).toHaveBeenCalledWith({ where: { id: "u2", tenantId: "t1" }, data: { role: "operario", active: false } });
+    expect(updateMany).toHaveBeenCalledWith({ where: { id: "u2", tenantId: "t1" }, data: { role: "bodega", active: false } });
     expect(auditCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ beforeData: { role: "operario", active: true }, afterData: { role: "operario", active: false } }),
+      data: expect.objectContaining({ beforeData: { role: "bodega", active: true }, afterData: { role: "bodega", active: false } }),
     });
   });
 
   it("does not write or audit when nothing changes", async () => {
-    await caller(admin).update({ id: "u2", role: "operario" });
+    await caller(admin).update({ id: "u2", role: "bodega" });
     expect(updateMany).not.toHaveBeenCalled();
     expect(auditCreate).not.toHaveBeenCalled();
   });
@@ -85,7 +85,7 @@ describe("users router", () => {
   it("never lets an admin change their own access", async () => {
     stored = { ...stored!, id: "admin-1", role: "admin" };
     await expect(caller(admin).update({ id: "admin-1", active: false })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(caller(admin).update({ id: "admin-1", role: "operario" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(caller(admin).update({ id: "admin-1", role: "bodega" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(updateMany).not.toHaveBeenCalled();
   });
 

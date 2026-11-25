@@ -12,7 +12,8 @@ import { UserAccessControls } from "@/app/(app)/usuarios/UserAccessControls";
 
 // Server Component with the same `admin` gate as `usersRouter` (the page
 // gate is never the only enforcement). New people appear here after they
-// sign up in Clerk (the webhook creates them as `operario`).
+// sign up in Clerk: the webhook creates them inactive ("pendiente") until
+// the administrator assigns one of the 5 roles and activates them.
 export default async function UsuariosPage() {
   const user = await getCurrentUser();
   if (!user) {
@@ -38,8 +39,8 @@ export default async function UsuariosPage() {
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
-          {activeCount} activos de {users.length}. Las personas nuevas aparecen aquí al registrarse, con rol
-          Operario. Cada cambio de rol o de estado queda en la auditoría.
+          {activeCount} activos de {users.length}. Las personas nuevas aparecen aquí al registrarse, inactivas:
+          elija su rol y toque Reactivar para darles acceso. Cada cambio de rol o de estado queda en la auditoría.
         </p>
       </div>
 
@@ -80,7 +81,7 @@ export default async function UsuariosPage() {
                     {isSelf && <span className="text-xs font-normal text-muted-foreground">(usted)</span>}
                     {!row.active && (
                       <span className="rounded-lg border border-destructive px-2 py-0.5 text-xs font-medium text-destructive">
-                        Inactivo
+                        Inactivo o pendiente
                       </span>
                     )}
                   </span>

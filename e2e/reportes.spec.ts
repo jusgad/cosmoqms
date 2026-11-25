@@ -32,9 +32,9 @@ test("el PDF del reporte es un PDF real", async ({ request }) => {
   expect((await response.body()).subarray(0, 5).toString()).toBe("%PDF-");
 });
 
-test("un operario no puede descargar el reporte", async ({ request }) => {
+test("bodega no puede descargar el reporte", async ({ request }) => {
   const response = await request.get("/api/reports/produccion?from=2026-10-01&to=2026-11-30&format=csv", {
-    headers: roleHeaders("operario"),
+    headers: roleHeaders("bodega"),
   });
   expect(response.status()).toBe(403);
 });

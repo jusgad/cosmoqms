@@ -6,8 +6,9 @@ import { ShieldOff } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 
 // Signed in to Clerk, but no active CosmoQMS user: either an admin
-// deactivated the account in /usuarios, or the signup webhook has not
-// created the row yet. Without this page /login and the app would bounce
+// deactivated the account in /usuarios, the account is new and still
+// pending (the webhook creates it inactive), or the row is not there yet.
+// Without this page /login and the app would bounce
 // the person back and forth.
 export default async function SinAccesoPage() {
   const { userId } = await auth();
@@ -24,11 +25,11 @@ export default async function SinAccesoPage() {
         <ShieldOff className="size-8 text-pending" aria-hidden />
         <h1 className="font-sans text-xl font-semibold text-foreground">Sin acceso a CosmoQMS</h1>
         <p className="text-sm text-foreground">
-          Su cuenta está desactivada o todavía no ha sido habilitada. Pida a un administrador que la revise en
-          la sección Usuarios.
+          Su cuenta está pendiente o desactivada. Las cuentas nuevas quedan pendientes hasta que el administrador
+          les asigna un rol y las activa en la sección Usuarios.
         </p>
         <p className="text-sm text-muted-foreground">
-          Si acaba de registrarse, espere unos segundos e intente de nuevo.
+          Cuando el administrador la active, toque Intentar de nuevo.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link

@@ -51,7 +51,7 @@ test("el admin no puede cambiar su propio acceso", async ({ request }) => {
 });
 
 test("ningún otro rol puede administrar usuarios", async ({ page, context, request }) => {
-  for (const role of ["director_tecnico", "calidad", "operario"] as const) {
+  for (const role of ["director_tecnico", "calidad", "bodega"] as const) {
     const attempt = await trpcCall(request, role, "users.update", { id: TARGET.id, role: "admin" });
     expect(attempt.status, role).toBe(403);
   }

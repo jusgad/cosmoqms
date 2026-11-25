@@ -26,10 +26,10 @@ vi.mock("@/lib/db", () => ({
 
 import { notificationsRouter } from "../notifications";
 
-const caller = (user: { id: string; tenantId: string; role: "operario" | "calidad" } | null) =>
+const caller = (user: { id: string; tenantId: string; role: "jefe_planta" | "calidad" } | null) =>
   notificationsRouter.createCaller({ user, prisma: {} as never });
 
-const me = { id: "u1", tenantId: "t1", role: "operario" as const };
+const me = { id: "u1", tenantId: "t1", role: "jefe_planta" as const };
 const NOTIFICATION_ID = "550e8400-e29b-41d4-a716-446655440000";
 
 describe("notifications router", () => {

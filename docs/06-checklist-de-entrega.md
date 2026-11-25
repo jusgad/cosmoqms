@@ -73,7 +73,6 @@ El sistema no se usa para lotes reales hasta completar esta sección.
 
 | Rol | Personas capacitadas | Fecha | Firma |
 |---|---|---|---|
-| Operario | | | |
 | Jefe de planta | | | |
 | Bodega | | | |
 | Calidad | | | |

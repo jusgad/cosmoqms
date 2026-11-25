@@ -138,7 +138,7 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 | Mecanismo | Implementación |
 |---|---|
 | Autenticación | Clerk: sesión en cookie, MFA con aplicación autenticadora |
-| Autorización por rol | Seis roles. Qué rol abre cada módulo está en un solo lugar (`src/lib/roles/modules.ts`), que usan el menú y las páginas (`requirePageRole`); cada procedimiento tRPC (`roleProcedure`) y ruta REST valida además el rol de la acción en el servidor |
+| Autorización por rol | Cinco roles (jefe de planta, bodega, calidad, director técnico y administrador); las cuentas nuevas quedan pendientes hasta que el administrador les asigna rol. Qué rol abre cada módulo está en un solo lugar (`src/lib/roles/modules.ts`), que usan el menú y las páginas (`requirePageRole`); cada procedimiento tRPC (`roleProcedure`) y ruta REST valida además el rol de la acción en el servidor |
 | Separación de funciones | El administrador abre todos los módulos en modo supervisión (solo lectura); ningún procedimiento de pesaje, firma, liberación, aprobación o recepción lo admite. Pantalla `/roles` con la matriz de permisos (`src/lib/roles/permissions.ts`) |
 | Revisión de accesos | `/usuarios/revision`: rol, MFA y último ingreso (consultado en Clerk) de cada cuenta, con hallazgos y exportación CSV |
 | Aislamiento por empresa | Dos barreras: filtro por `tenant_id` en cada consulta y Row Level Security forzado en las 18 tablas (`db/rls.sql`) |
@@ -164,8 +164,8 @@ Los cambios de estructura se hacen solo con migraciones de Prisma
 
 | Control | Alcance |
 |---|---|
-| Pruebas unitarias (Vitest) | 55 archivos, 376 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor, especificaciones de calidad, versionado de fórmulas, inventario y vencimientos, batch record, etiquetas, revisión de accesos, pendientes y acciones rápidas por rol y matriz de permisos |
-| Pruebas E2E (Playwright) | 42 pruebas con navegador real contra Docker: flujo BPM completo, permisos de los 6 roles en escritorio y celular, SOPs, usuarios, API y reportes |
+| Pruebas unitarias (Vitest) | 55 archivos, 379 pruebas: reglas de negocio, routers, seguridad, reportes, contrato OpenAPI, lectura del QR del proveedor, especificaciones de calidad, versionado de fórmulas, inventario y vencimientos, batch record, etiquetas, revisión de accesos, pendientes y acciones rápidas por rol y matriz de permisos |
+| Pruebas E2E (Playwright) | 51 pruebas con navegador real contra Docker: flujo BPM completo, ciclo de desviaciones y QC, recorrido de todas las pantallas de cada rol, permisos de los 5 roles en escritorio y celular, SOPs, usuarios, API y reportes |
 | Integración continua | En cada cambio: lint, tipos, pruebas, build, migraciones en una base vacía y verificación de seguridad de la base |
 | Validación | Paquete IQ/OQ/PQ en [validacion/](validacion/01-plan-maestro-validacion.md) |
 

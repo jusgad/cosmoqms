@@ -7,14 +7,14 @@ import { ReportDeviationForm } from "@/components/quality/ReportDeviationForm";
 // Task 12): re-checks role server-side before rendering the client
 // component — the "Reportar desviación" link on the batch record page is a
 // convenience, never the actual authorization boundary (`deviations.create`'s
-// own `roleProcedure("calidad", "jefe_planta", "operario")` is that boundary).
+// own `roleProcedure("calidad", "jefe_planta")` is that boundary).
 export default async function NuevaDesviacionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }
-  if (!["calidad", "jefe_planta", "operario"].includes(user.role)) {
+  if (!["calidad", "jefe_planta"].includes(user.role)) {
     redirect(`/produccion/${id}`);
   }
 

@@ -70,7 +70,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 import { qcRouter } from "../qc";
 
-type Role = "calidad" | "director_tecnico" | "operario";
+type Role = "calidad" | "director_tecnico" | "bodega";
 const caller = (role: Role) => qcRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
 
 const ORDER_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -310,7 +310,7 @@ describe("qc.reject", () => {
     expect(result.signature.stage).toBe("rechazado");
   });
 
-  it.each(["calidad", "operario"] as const)("forbids the '%s' role from rejecting", async (role) => {
+  it.each(["calidad", "bodega"] as const)("forbids the '%s' role from rejecting", async (role) => {
     expect(await codeOf(caller(role).reject(decisionInput))).toBe("FORBIDDEN");
     expect(updateMany).not.toHaveBeenCalled();
   });

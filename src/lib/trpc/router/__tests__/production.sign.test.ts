@@ -42,8 +42,8 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 import { productionRouter } from "../production";
 
-type Role = "operario" | "jefe_planta" | "calidad" | "director_tecnico" | "admin";
-const caller = (role: Role = "operario") =>
+type Role = "jefe_planta" | "calidad" | "director_tecnico" | "admin";
+const caller = (role: Role = "jefe_planta") =>
   productionRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
 
 const ORDER_ID = "550e8400-e29b-41d4-a716-446655440000";
@@ -145,9 +145,9 @@ describe("production.sign", () => {
   );
 
   // Final review (Important 6): per-stage signer roles.
-  it("forbids an operario from signing the 'calidad' stage", async () => {
+  it("forbids the jefe de planta from signing the 'calidad' stage", async () => {
     currentOrder = { id: "po1", formulaId: "f1", status: "calidad" };
-    const error = await caller("operario")
+    const error = await caller("jefe_planta")
       .sign({ productionOrderId: ORDER_ID, stage: "calidad", meaningStatement: "Confirmo la calidad del lote", reauthVerified: true })
       .catch((e: unknown) => e);
     expect((error as TRPCError).code).toBe("FORBIDDEN");

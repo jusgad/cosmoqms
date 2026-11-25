@@ -34,7 +34,7 @@ const bodySchema = z.object({ events: z.array(eventSchema) });
 const PRISMA_UNIQUE_VIOLATION = "P2002";
 
 // Matches `production.recordWeighing`'s own role gate (Task 14 review round 1).
-const OFFLINE_CAPTURE_ROLES = ["operario", "jefe_planta"] as const;
+const OFFLINE_CAPTURE_ROLES = ["jefe_planta"] as const;
 
 // Final-review fix (Important 7a): a business-rule rejection of ONE event
 // (order already past its weighing phase — including a released/rejected,

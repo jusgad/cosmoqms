@@ -63,7 +63,7 @@ vi.mock("@/lib/db", () => ({
 
 import { deviationsRouter } from "../deviations";
 
-const caller = (role: "calidad" | "jefe_planta" | "operario" | "director_tecnico" | "bodega" | "admin") =>
+const caller = (role: "calidad" | "jefe_planta" | "director_tecnico" | "bodega" | "admin") =>
   deviationsRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
 
 describe("deviations.approve", () => {
@@ -109,7 +109,7 @@ describe("deviations.create", () => {
   it("rejects a productionOrderId that doesn't belong to the caller's tenant", async () => {
     orderForCreate = null;
     await expect(
-      caller("operario").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
+      caller("jefe_planta").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(productionOrderFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "550e8400-e29b-41d4-a716-446655440000", tenantId: "t1" } }),
@@ -117,14 +117,14 @@ describe("deviations.create", () => {
     expect(deviationCreate).not.toHaveBeenCalled();
   });
 
-  it("rejects create from a role not in calidad/jefe_planta/operario", async () => {
+  it("rejects create from a role not in calidad/jefe_planta", async () => {
     await expect(
       caller("bodega").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("creates a deviation with status abierta", async () => {
-    const result = await caller("operario").create({
+    const result = await caller("jefe_planta").create({
       productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
       description: "0123456789",
     });
@@ -133,7 +133,7 @@ describe("deviations.create", () => {
   });
 
   it("notifies calidad and director_tecnico (never the reporter) and emails after commit", async () => {
-    await caller("operario").create({
+    await caller("jefe_planta").create({
       productionOrderId: "550e8400-e29b-41d4-a716-446655440000",
       description: "Temperatura de mezcla fuera de rango",
     });
@@ -167,7 +167,7 @@ describe("deviations.create", () => {
   it("creates no notification and sends nothing when the order is outside the tenant", async () => {
     orderForCreate = null;
     await expect(
-      caller("operario").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
+      caller("jefe_planta").create({ productionOrderId: "550e8400-e29b-41d4-a716-446655440000", description: "0123456789" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(notificationCreateManyAndReturn).not.toHaveBeenCalled();
     expect(deliverEmails).not.toHaveBeenCalled();
@@ -185,7 +185,7 @@ describe("deviations.startInvestigation", () => {
 
   it("rejects startInvestigation from a role other than calidad", async () => {
     await expect(
-      caller("operario").startInvestigation({ id: "550e8400-e29b-41d4-a716-446655440000" }),
+      caller("jefe_planta").startInvestigation({ id: "550e8400-e29b-41d4-a716-446655440000" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
@@ -216,7 +216,7 @@ describe("deviations.submitInvestigation", () => {
 
   it("rejects submitInvestigation from a role other than calidad", async () => {
     await expect(
-      caller("operario").submitInvestigation({
+      caller("jefe_planta").submitInvestigation({
         id: "550e8400-e29b-41d4-a716-446655440000",
         investigation: "0123456789",
         correctiveAction: "0123456789",

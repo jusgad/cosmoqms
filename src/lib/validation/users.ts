@@ -2,10 +2,9 @@ import { z } from "zod";
 
 // Schema-only module: safe to import from client components.
 
-export const ROLE_VALUES = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] as const;
+export const ROLE_VALUES = ["jefe_planta", "calidad", "director_tecnico", "bodega", "admin"] as const;
 
 export const ROLE_LABELS: Record<(typeof ROLE_VALUES)[number], string> = {
-  operario: "Operario",
   jefe_planta: "Jefe de planta",
   calidad: "Calidad",
   director_tecnico: "Director técnico",

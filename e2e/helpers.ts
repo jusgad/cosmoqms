@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
-export type Role = "operario" | "jefe_planta" | "calidad" | "director_tecnico" | "bodega" | "admin";
+export type Role = "jefe_planta" | "calidad" | "director_tecnico" | "bodega" | "admin";
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3001";
 

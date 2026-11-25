@@ -18,7 +18,7 @@ import { productionRouter } from "../production";
 describe("production.recordWeighing", () => {
   it("delegates to applyWeighing with the caller's tenant/actor and returns the tenant-scoped order", async () => {
     const caller = productionRouter.createCaller({
-      user: { id: "u1", tenantId: "t1", role: "operario" },
+      user: { id: "u1", tenantId: "t1", role: "jefe_planta" },
       prisma: {} as never,
     });
 

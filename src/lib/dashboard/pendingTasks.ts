@@ -8,7 +8,7 @@ import { isLowStock } from "@/lib/materials/lotAvailability";
 
 export type PendingTask = { key: string; label: string; count: number; href: string };
 
-const FLOOR_ROLES: Role[] = ["operario", "jefe_planta", "bodega", "calidad", "director_tecnico"];
+const FLOOR_ROLES: Role[] = ["jefe_planta", "bodega", "calidad", "director_tecnico"];
 
 async function unreadSops(tx: Prisma.TransactionClient, tenantId: string, userId: string): Promise<number> {
   return tx.sop.count({ where: { tenantId, status: "vigente", acknowledgments: { none: { userId } } } });
@@ -30,11 +30,9 @@ export async function loadPendingTasks(
   const tasks: PendingTask[] = [];
   const add = (key: string, label: string, count: number, href: string) => tasks.push({ key, label, count, href });
 
-  if (role === "operario" || role === "jefe_planta") {
+  if (role === "jefe_planta") {
     add("pesar", "Órdenes por pesar", await tx.productionOrder.count({ where: { tenantId, status: { in: ["planificado", "pesado"] } } }), "/produccion");
     add("firmar", "Etapas de mezclado o envasado por firmar", await tx.productionOrder.count({ where: { tenantId, status: { in: ["mezclado", "envasado"] } } }), "/produccion");
-  }
-  if (role === "jefe_planta") {
     add("borradores", "Fórmulas en borrador", await tx.masterFormula.count({ where: { tenantId, status: "draft" } }), "/formulas");
   }
   if (role === "bodega") {

@@ -56,11 +56,9 @@ describe("/api/v1/materias-primas", () => {
     expect(findMany).toHaveBeenCalledWith({ where: { tenantId: "t1" }, orderBy: { code: "asc" } });
   });
 
-  it("401 without a session, 403 for a role outside the endpoint", async () => {
+  it("401 without a session, 403 for a role that may not write", async () => {
     session.role = null;
     expect((await list()).status).toBe(401);
-    session.role = "operario";
-    expect((await list()).status).toBe(403);
     session.role = "calidad";
     expect((await create(json("POST", { code: "A", name: "B", unit: "kg" }))).status).toBe(403);
   });

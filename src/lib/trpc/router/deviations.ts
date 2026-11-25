@@ -50,7 +50,7 @@ export const deviationsRouter = router({
   // same as `qc.listPending`'s own precedent). Kept on the router for API
   // completeness/testability (e.g. a future mobile client or offline sync
   // consumer), same reasoning `qc.listPending` documents.
-  list: roleProcedure("calidad", "director_tecnico", "jefe_planta", "operario", "admin").query(({ ctx }) =>
+  list: roleProcedure("calidad", "director_tecnico", "jefe_planta", "admin").query(({ ctx }) =>
     tenantTx(ctx, (tx) =>
       tx.deviation.findMany({
         where: { tenantId: ctx.user.tenantId, status: { not: "cerrada" } },
@@ -59,7 +59,7 @@ export const deviationsRouter = router({
     ),
   ),
 
-  getById: roleProcedure("calidad", "director_tecnico", "jefe_planta", "operario", "admin")
+  getById: roleProcedure("calidad", "director_tecnico", "jefe_planta", "admin")
     .input(z.object({ id: z.string().uuid() }))
     .query(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
@@ -73,7 +73,7 @@ export const deviationsRouter = router({
   // verified to belong to the caller's tenant before the deviation is
   // written — a deviation must never be attached to another tenant's batch
   // (where it would also block that tenant's release).
-  create: roleProcedure("calidad", "jefe_planta", "operario")
+  create: roleProcedure("calidad", "jefe_planta")
     .input(createDeviationInput)
     .mutation(async ({ ctx, input }) => {
       const { deviation, emails } = await tenantTx(ctx, async (tx) => {

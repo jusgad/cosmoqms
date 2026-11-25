@@ -4,7 +4,7 @@ import { z } from "zod";
 
 // Who does what with controlled documents. Plain strings (not the Prisma
 // `Role` enum) keep this module client-safe; the router enforces them.
-export const SOP_VIEW_ROLES = ["operario", "jefe_planta", "calidad", "director_tecnico", "bodega"] as const;
+export const SOP_VIEW_ROLES = ["jefe_planta", "calidad", "director_tecnico", "bodega"] as const;
 export const SOP_EDIT_ROLES = ["calidad", "director_tecnico"] as const;
 export const SOP_APPROVE_ROLES = ["director_tecnico"] as const;
 

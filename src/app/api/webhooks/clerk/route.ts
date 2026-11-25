@@ -4,6 +4,7 @@ import { withTenant } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { clerkClient } from "@clerk/nextjs/server";
 import { isMembershipQuotaError } from "@/lib/users/clerkSeats";
+import { ROLE_VALUES } from "@/lib/validation/users";
 import type {
   OrganizationJSON,
   OrganizationMembershipJSON,
@@ -20,28 +21,26 @@ import type {
 // never a schema or security rewrite.
 const DEFAULT_ORGANIZATION_NAME = "CosmoQMS";
 // Clerk's own membership role (not our business `Role` enum, which lives in
-// `public_metadata.role` and is resolved separately by `resolveRole` below).
+// `public_metadata.role` and is read by `roleFromMetadata` below).
 const DEFAULT_CLERK_MEMBERSHIP_ROLE = "org:member";
 
-const VALID_ROLES: readonly string[] = [
-  "operario",
-  "jefe_planta",
-  "calidad",
-  "director_tecnico",
-  "bodega",
-  "admin",
-];
+const VALID_ROLES: readonly string[] = ROLE_VALUES;
 
-const DEFAULT_ROLE: Role = "operario";
+// CosmoQMS has 5 roles and no "default" one: every signup auto-joins the
+// organization (see above), so a new person must not get access by just
+// registering. The very first account of the company becomes its
+// administrator; everyone after that is created inactive ("pendiente") and
+// the administrator assigns the role and activates them in /usuarios. A role
+// set by an admin in Clerk's public metadata is honored as is.
+const FIRST_USER_ROLE: Role = "admin";
+const PENDING_PLACEHOLDER_ROLE: Role = "bodega";
 
-function resolveRole(publicMetadata: unknown): Role {
+function roleFromMetadata(publicMetadata: unknown): Role | null {
   const candidate =
     typeof publicMetadata === "object" && publicMetadata !== null
       ? (publicMetadata as Record<string, unknown>).role
       : undefined;
-  return typeof candidate === "string" && VALID_ROLES.includes(candidate)
-    ? (candidate as Role)
-    : DEFAULT_ROLE;
+  return typeof candidate === "string" && VALID_ROLES.includes(candidate) ? (candidate as Role) : null;
 }
 
 function fullNameFrom(firstName: string | null, lastName: string | null, fallback: string): string {
@@ -73,7 +72,7 @@ async function upsertOrganization(data: OrganizationJSON): Promise<void> {
 async function upsertUserFromMembership(membership: OrganizationMembershipJSON): Promise<void> {
   const tenantId = membership.organization.id;
   const userId = membership.public_user_data.user_id;
-  const role = resolveRole(membership.public_metadata);
+  const metadataRole = roleFromMetadata(membership.public_metadata);
   const email = membership.public_user_data.identifier;
   const fullName = fullNameFrom(
     membership.public_user_data.first_name,
@@ -86,17 +85,20 @@ async function upsertUserFromMembership(membership: OrganizationMembershipJSON):
   // policy hides that row from this tenant-scoped upsert, which then tries an
   // INSERT and fails on the primary key. Multi-org membership is out of the
   // current single-org MVP scope; see db/rls.sql's header.
-  await withTenant(tenantId, WEBHOOK_ACTOR, (tx) =>
-    tx.user.upsert({
-      where: { id: userId },
-      create: { id: userId, tenantId, fullName, email, role },
-      // The role is set from Clerk metadata only when the user is first
-      // created. Afterwards the app is the source of truth: admins change it
-      // in /usuarios (audited), and a later membership event must never
-      // silently overwrite that decision.
-      update: { tenantId, fullName, email },
-    }),
-  );
+  await withTenant(tenantId, WEBHOOK_ACTOR, async (tx) => {
+    const existing = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
+    if (existing) {
+      // The role is set only when the user is first created. Afterwards the
+      // app is the source of truth: admins change it in /usuarios (audited),
+      // and a later membership event must never overwrite that decision.
+      await tx.user.update({ where: { id: userId }, data: { tenantId, fullName, email } });
+      return;
+    }
+    const isFirst = (await tx.user.count({ where: { tenantId } })) === 0;
+    const role = metadataRole ?? (isFirst ? FIRST_USER_ROLE : PENDING_PLACEHOLDER_ROLE);
+    const active = metadataRole !== null || isFirst;
+    await tx.user.create({ data: { id: userId, tenantId, fullName, email, role, active } });
+  });
 }
 
 /**

@@ -29,7 +29,7 @@ import {
 export const productionRouter = router({
   // NOTE: kept the brief's literal `orderBy: { createdBy: "asc" }` (Step 7) —
   // task-9-report.md flags it as a probable brief typo with no functional risk.
-  list: roleProcedure("jefe_planta", "calidad", "director_tecnico", "operario", "admin").query(({ ctx }) =>
+  list: roleProcedure("jefe_planta", "calidad", "director_tecnico", "admin").query(({ ctx }) =>
     tenantTx(ctx, (tx) =>
       tx.productionOrder.findMany({
         where: { tenantId: ctx.user.tenantId },
@@ -38,7 +38,7 @@ export const productionRouter = router({
       }),
     ),
   ),
-  getById: roleProcedure("jefe_planta", "calidad", "director_tecnico", "operario", "admin")
+  getById: roleProcedure("jefe_planta", "calidad", "director_tecnico", "admin")
     .input(z.object({ id: z.string().uuid() }))
     .query(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
@@ -86,7 +86,7 @@ export const productionRouter = router({
   // decrement live in `applyWeighing` (shared with `/api/sync/events`); the
   // client-sent `theoreticalQty` is accepted by the schema (the form shares
   // it) but never persisted — the server recomputes it.
-  recordWeighing: roleProcedure("operario", "jefe_planta")
+  recordWeighing: roleProcedure("jefe_planta")
     .input(recordWeighingInput)
     .mutation(({ ctx, input }) =>
       tenantTx(ctx, async (tx) => {
@@ -124,12 +124,12 @@ export const productionRouter = router({
   // - `stage` is restricted to `SIGNABLE_STAGES` (see `signInput`), so
   //   `planificado` can no longer be "signed" to skip weighing entirely.
   // - Per-stage signer roles (`STAGE_SIGNER_ROLES`): production-floor stages
-  //   by `operario`/`jefe_planta`, the `calidad` stage only by
+  //   by `jefe_planta`, the `calidad` stage only by
   //   `calidad`/`director_tecnico`. The procedure-level role list is the
   //   union; this narrows it per stage.
   // - Signing `pesado` requires every formula ingredient to have a weighing
   //   (`assertAllIngredientsWeighed`), not just the first one.
-  sign: roleProcedure("operario", "jefe_planta", "calidad", "director_tecnico")
+  sign: roleProcedure("jefe_planta", "calidad", "director_tecnico")
     .input(signInput)
     .mutation(async ({ ctx, input }) => {
       if (!STAGE_SIGNER_ROLES[input.stage].includes(ctx.user.role)) {

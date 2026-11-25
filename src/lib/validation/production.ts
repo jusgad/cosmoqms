@@ -48,8 +48,8 @@ export function isSignableStage(value: string): value is SignableStage {
 }
 
 // Who may attest each stage (Blueprint's role table, "Roles y permisos"):
-// `operario` "captura pesaje/mezclado/envasado de su etapa, firma su etapa",
-// with `jefe_planta` (plant supervisor) also allowed for the production
+// the plant ("captura pesaje/mezclado/envasado de su etapa, firma su etapa")
+// is `jefe_planta` since CosmoQMS works with 5 roles (no operario) for the production
 // floor stages. The `calidad` stage is a quality attestation — Blueprint
 // gives `calidad` "registrar resultados QC ... aprobar/rechazar puntos
 // críticos" and `director_tecnico` "todo lo de calidad", so those two sign it;
@@ -57,9 +57,9 @@ export function isSignableStage(value: string): value is SignableStage {
 // Prisma `Role` enum value) keep this module client-bundle safe; the router
 // enforces it server-side, `SignaturePad`/the batch page only mirror it.
 export const STAGE_SIGNER_ROLES: Record<SignableStage, readonly string[]> = {
-  pesado: ["operario", "jefe_planta"],
-  mezclado: ["operario", "jefe_planta"],
-  envasado: ["operario", "jefe_planta"],
+  pesado: ["jefe_planta"],
+  mezclado: ["jefe_planta"],
+  envasado: ["jefe_planta"],
   calidad: ["calidad", "director_tecnico"],
 };
 

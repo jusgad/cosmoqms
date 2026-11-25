@@ -7,7 +7,7 @@ implementación y con las pruebas que lo verifican. Pruebas unitarias en
 
 | Req. | Implementación principal | Pruebas automatizadas | OQ manual | PQ |
 |---|---|---|---|---|
-| URS-01 Acceso y roles | `src/lib/auth.ts`, `src/lib/pageAccess.ts`, `src/lib/trpc/trpc.ts` (`roleProcedure`), `Sidebar.tsx` | `lib/__tests__/auth.test.ts`, `lib/trpc/__tests__/trpc.test.ts`, `lib/__tests__/demoMode.test.ts`, `e2e/navegacion.spec.ts` (6 roles, escritorio y celular) | B01, B02 | PQ-04 |
+| URS-01 Acceso y roles | `src/lib/auth.ts`, `src/lib/pageAccess.ts`, `src/lib/trpc/trpc.ts` (`roleProcedure`), `Sidebar.tsx` | `lib/__tests__/auth.test.ts`, `lib/trpc/__tests__/trpc.test.ts`, `lib/__tests__/demoMode.test.ts`, `e2e/navegacion.spec.ts` (5 roles, escritorio y celular) | B01, B02 | PQ-04 |
 | URS-02 Aislamiento por empresa | `db/rls.sql`, `db/runtime-role.sql`, `withTenant` en `src/lib/db.ts` | `lib/__tests__/db.test.ts`, `scripts/verify-db-security.sh` (CI, trabajo de base de datos) | B13 | — |
 | URS-03 Recepción en cuarentena | router `materials.receiveLot`, `ReceiveLotForm.tsx`, adjuntos | `lib/trpc/router/__tests__/materials.test.ts`, `lib/attachments/__tests__/service.test.ts`, `sniff.test.ts`, `e2e/flujo-produccion.spec.ts` | B03 | PQ-01 |
 | URS-04 Liberación de lotes de MP | `materials.setStatus` (máquina de estados del lote) | `materials.test.ts`, `e2e/flujo-produccion.spec.ts` | B03 | PQ-01 |

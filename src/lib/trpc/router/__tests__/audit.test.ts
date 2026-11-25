@@ -47,7 +47,7 @@ vi.mock("@/lib/db", () => ({
 
 import { auditRouter } from "../audit";
 
-const caller = (role: "admin" | "director_tecnico" | "operario") =>
+const caller = (role: "admin" | "director_tecnico" | "bodega") =>
   auditRouter.createCaller({ user: { id: "u1", tenantId: "t1", role }, prisma: {} as never });
 
 describe("audit.search", () => {
@@ -57,7 +57,7 @@ describe("audit.search", () => {
   });
 
   it("rejects a caller without admin/director_tecnico role", async () => {
-    await expect(caller("operario").search({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller("bodega").search({})).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(auditLogFindMany).not.toHaveBeenCalled();
   });
 
@@ -103,7 +103,7 @@ describe("audit.export", () => {
   });
 
   it("rejects a caller without admin/director_tecnico role", async () => {
-    await expect(caller("operario").export({})).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller("bodega").export({})).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
   it("returns a CSV string with a header row and one row per audit_log entry", async () => {

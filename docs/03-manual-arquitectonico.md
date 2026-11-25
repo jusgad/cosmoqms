@@ -19,7 +19,7 @@ Detalle de tecnologías y configuración: [manual técnico](02-manual-tecnico.md
 
 ```mermaid
 flowchart LR
-  personal["Personal del laboratorio<br/>(6 roles)"] -->|HTTPS| app["CosmoQMS"]
+  personal["Personal del laboratorio<br/>(5 roles)"] -->|HTTPS| app["CosmoQMS"]
   integrador["Sistema externo"] -->|API REST v1| app
   monitor["Monitor de disponibilidad"] -->|/api/health| app
   app <-->|sesiones, MFA, webhooks| clerk["Clerk<br/>(identidad)"]
@@ -232,7 +232,7 @@ la misma transacción. Las órdenes guardan la versión con la que se hicieron. 
 pesaje descuenta el inventario del lote con una escritura condicionada
 (`quantity_available >= pesado`) y rechaza lotes vencidos o sin liberar; las
 mismas reglas (`src/lib/materials/lotAvailability.ts`) filtran lo que ve el
-operario.
+jefe de planta al pesar.
 
 ### 6.10 Base de datos propia
 
@@ -258,7 +258,7 @@ cambio, el laboratorio asume la operación (ver
 | Atributo | Decisión |
 |---|---|
 | Mantenibilidad | Un módulo por dominio, sin imports cruzados entre routers; componentes de máximo 300 líneas; TypeScript estricto sin `any` |
-| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 376 pruebas unitarias y 42 E2E |
+| Verificabilidad | Reglas en funciones puras probadas (máquina de estados, tolerancias, especificaciones); 379 pruebas unitarias y 51 E2E |
 | Disponibilidad | Healthchecks y reinicio automático de contenedores; monitor externo |
 | Rendimiento | Paginación en el servidor (25 por página, 50 en auditoría); índices por `tenant_id` |
 | Usabilidad en planta | Diseño mobile-first, botones de al menos 44 px, PWA instalable |

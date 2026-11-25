@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import { accessReviewCsv, buildAccessReview, type ReviewUser } from "../accessReview";
 
 const NOW = new Date("2026-11-22T15:00:00.000Z");
-const base: ReviewUser = { id: "u1", fullName: "Ana", email: "ana@lab.co", role: "operario", active: true, mfaEnabled: true };
+const base: ReviewUser = { id: "u1", fullName: "Ana", email: "ana@lab.co", role: "bodega", active: true, mfaEnabled: true };
 
 describe("buildAccessReview", () => {
   it("has no findings for an active user with MFA who signed in recently", () => {
     const [row] = buildAccessReview([base], new Map([["u1", { lastSignInAt: new Date("2026-11-20"), twoFactorEnabled: true }]]), NOW);
     expect(row.findings).toEqual([]);
-    expect(row.roleLabel).toBe("Operario");
+    expect(row.roleLabel).toBe("Bodega");
   });
 
   it("flags missing MFA, never signed in and long inactivity", () => {

@@ -27,7 +27,7 @@ const { requireRole, MockUnauthorizedError, MockForbiddenError } = vi.hoisted(()
   class MockUnauthorizedError extends Error {}
   class MockForbiddenError extends Error {}
   return {
-    requireRole: vi.fn(async () => ({ id: "u1", tenantId: "t1", role: "operario" as const })),
+    requireRole: vi.fn(async () => ({ id: "u1", tenantId: "t1", role: "jefe_planta" as const })),
     MockUnauthorizedError,
     MockForbiddenError,
   };
@@ -71,7 +71,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   findFirst.mockResolvedValue(null);
   applyWeighing.mockResolvedValue({ id: "ev1" });
-  requireRole.mockResolvedValue({ id: "u1", tenantId: "t1", role: "operario" as const });
+  requireRole.mockResolvedValue({ id: "u1", tenantId: "t1", role: "jefe_planta" as const });
 });
 
 describe("POST /api/sync/events", () => {

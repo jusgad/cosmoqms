@@ -54,7 +54,7 @@ test("no se permite un segundo borrador del mismo código", async ({ request }) 
 });
 
 test("el piso no ve borradores", async ({ page, context }) => {
-  await asRole(context, "operario");
+  await asRole(context, "jefe_planta");
   await page.goto("/sops");
   await expect(page.getByText(code)).toHaveCount(0);
   await page.goto(`/sops/${draftId}`);
@@ -88,8 +88,8 @@ test("aprobar exige reautenticación real (firma electrónica)", async ({ page, 
   expect(asQuality.status).toBe(403);
 });
 
-test("el operario confirma la lectura del SOP vigente y calidad lo ve", async ({ page, context }) => {
-  await asRole(context, "operario");
+test("el jefe de planta confirma la lectura del SOP vigente y calidad lo ve", async ({ page, context }) => {
+  await asRole(context, "jefe_planta");
   await page.goto("/sops");
   await page.getByRole("link", { name: /Pesaje de materias primas/ }).click();
   await expectHeading(page, "Pesaje de materias primas");
@@ -106,7 +106,7 @@ test("el operario confirma la lectura del SOP vigente y calidad lo ve", async ({
 });
 
 test("la versión obsoleta queda en el historial y no se puede confirmar", async ({ page, context, request }) => {
-  await asRole(context, "operario");
+  await asRole(context, "jefe_planta");
   await page.goto("/sops");
   await page.getByRole("link", { name: /Limpieza y sanitización/ }).click();
   await expectHeading(page, /Limpieza y sanitización/);
@@ -116,6 +116,6 @@ test("la versión obsoleta queda en el historial y no se puede confirmar", async
   await expect(page.getByRole("button", { name: "Confirmar lectura" })).toHaveCount(0);
 
   const obsoleteId = page.url().split("/").pop()!;
-  const attempt = await trpcCall(request, "operario", "sops.acknowledge", { id: obsoleteId });
+  const attempt = await trpcCall(request, "jefe_planta", "sops.acknowledge", { id: obsoleteId });
   expect(attempt.status).toBe(409);
 });

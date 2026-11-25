@@ -7,7 +7,7 @@ cosmético, conforme a BPM e INVIMA.
 
 | N.º | Manual | Para quién | Contenido |
 |---|---|---|---|
-| 1 | [Manual de usuario](01-manual-de-usuario.md) | Todo el personal | Uso del sistema por rol: operario, jefe de planta, bodega, calidad, director técnico y administrador |
+| 1 | [Manual de usuario](01-manual-de-usuario.md) | Todo el personal | Uso del sistema por rol (5 roles): jefe de planta, bodega, calidad, director técnico y administrador |
 | 2 | [Manual técnico](02-manual-tecnico.md) | Área de TI, auditores | Tecnologías y versiones, componentes, configuración, modelo de datos, interfaces y mecanismos de seguridad |
 | 3 | [Manual arquitectónico](03-manual-arquitectonico.md) | Arquitectos, auditores, desarrolladores | Diseño del sistema y sus decisiones: aislamiento por empresa, audit trail, firma electrónica, modo sin conexión |
 | 4 | [Manual de desarrollador](04-manual-de-desarrollador.md) | Desarrolladores | Entorno local, reglas de código, cómo agregar funcionalidades, pruebas, CI y control de cambios |

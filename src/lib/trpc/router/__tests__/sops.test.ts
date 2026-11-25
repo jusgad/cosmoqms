@@ -67,7 +67,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 import { sopsRouter } from "../sops";
 import { SOP_APPROVAL_MEANING_STATEMENT } from "@/lib/validation/sops";
 
-type Role = "operario" | "calidad" | "director_tecnico" | "admin" | "bodega";
+type Role = "bodega" | "calidad" | "director_tecnico" | "admin";
 const caller = (role: Role) => sopsRouter.createCaller({ user: { id: `u-${role}`, tenantId: "t1", role }, prisma: {} as never });
 
 const approval = {
@@ -91,7 +91,7 @@ describe("sops router", () => {
   });
 
   it("only the quality unit drafts, only the director approves, admin only reads", async () => {
-    await expect(caller("operario").create({ code: "SOP-X", title: "Nuevo" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller("bodega").create({ code: "SOP-X", title: "Nuevo" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller("calidad").approve(approval)).rejects.toMatchObject({ code: "FORBIDDEN" });
     // Supervision mode: the administrator reads SOPs but never drafts,
     // approves or records a training acknowledgement.
@@ -149,14 +149,14 @@ describe("sops router", () => {
   });
 
   it("acknowledging is only for the vigente version and is idempotent", async () => {
-    await expect(caller("operario").acknowledge({ id: SOP_ID })).rejects.toMatchObject({ code: "CONFLICT" });
-    await caller("operario").acknowledge({ id: OLD_ID });
-    await caller("operario").acknowledge({ id: OLD_ID });
-    expect(acks).toEqual([{ sopId: OLD_ID, userId: "u-operario" }]);
+    await expect(caller("bodega").acknowledge({ id: SOP_ID })).rejects.toMatchObject({ code: "CONFLICT" });
+    await caller("bodega").acknowledge({ id: OLD_ID });
+    await caller("bodega").acknowledge({ id: OLD_ID });
+    expect(acks).toEqual([{ sopId: OLD_ID, userId: "u-bodega" }]);
   });
 
   it("a SOP from another tenant is not found", async () => {
     rows = rows.map((row) => ({ ...row, tenantId: "otro" }));
-    await expect(caller("operario").acknowledge({ id: OLD_ID })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(caller("bodega").acknowledge({ id: OLD_ID })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

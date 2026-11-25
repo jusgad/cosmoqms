@@ -60,7 +60,7 @@ export function UserAccessControls({
         <select
           id={selectId}
           value={role}
-          disabled={update.isPending || !active}
+          disabled={update.isPending}
           onChange={(event) => changeRole(event.target.value as Role)}
           className="h-11 min-h-[44px] rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         >

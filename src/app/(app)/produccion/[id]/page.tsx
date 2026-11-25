@@ -62,7 +62,7 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
 
       <StageTracker status={order.status} />
 
-      {WEIGHABLE_STATUSES.includes(order.status) && (user.role === "operario" || user.role === "jefe_planta") && (
+      {WEIGHABLE_STATUSES.includes(order.status) && user.role === "jefe_planta" && (
         <Button
           render={
             <Link href={`/produccion/${order.id}/pesaje`}>
@@ -97,7 +97,7 @@ export default async function BatchRecordPage({ params }: { params: Promise<{ id
           `deviations.create` — gated client-side to the same roles
           `deviations.create`'s `roleProcedure` allows server-side
           (`nueva/page.tsx` re-checks this, same pattern as `liberar/page.tsx`). */}
-      {["calidad", "jefe_planta", "operario"].includes(user.role) && (
+      {["calidad", "jefe_planta"].includes(user.role) && (
         <Button
           variant="outline"
           render={<Link href={`/produccion/${order.id}/desviacion/nueva`}>Reportar desviación</Link>}
